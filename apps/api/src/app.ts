@@ -16,6 +16,7 @@ import { adminRouter } from './routes/admin.routes.js';
 import { documentRouter } from './routes/document.routes.js';
 import { reportRouter } from './routes/report.routes.js';
 import { qrRouter } from './routes/qr.routes.js';
+import { release } from '@ovelo/shared/release';
 export const app = express();
 app.disable('x-powered-by');
 app.set('trust proxy', env.TRUST_PROXY ? 1 : false);
@@ -64,7 +65,7 @@ app.use((req, res, next) => {
 });
 app.use(loadSession);
 app.use(csrf);
-app.get('/health', (_req, res) => res.json({ status: 'ok', service: 'ovelo-api' }));
+app.get('/health', (_req, res) => res.json({ status: 'ok', service: 'ovelo-api', ...release }));
 const api = express.Router();
 api.use('/auth', authRouter);
 api.use('/items', itemRouter);

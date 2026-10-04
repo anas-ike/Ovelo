@@ -3,6 +3,8 @@ import { createHmac } from 'node:crypto';
 import { ensureRedis } from '../config/redis.js';
 import { env } from '../config/env.js';
 import { AppError } from './error.js';
+import { logger } from '../utils/logger.js';
+import { redisFailure } from '@ovelo/shared/redis';
 
 export const rateLimit =
   (name: string, max = env.RATE_LIMIT_MAX, windowMs = env.RATE_LIMIT_WINDOW): RequestHandler =>
@@ -28,6 +30,7 @@ export const rateLimit =
       }
       next();
     } catch (error) {
+      if (!(error instanceof AppError)) logger.error({ subsystem: 'rate-limit', limiter: name, code: redisFailure(error), requestId: res.locals.requestId }, 'Redis request protection failed closed');
       next(
         error instanceof AppError
           ? error

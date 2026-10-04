@@ -3,7 +3,10 @@ import { prisma } from '../database/prisma.js';
 import { queueConnection } from '../config/redis.js';
 import { QUEUES } from '@ovelo/shared';
 import { AppError } from '../middleware/error.js';
+import { logger } from '../utils/logger.js';
+import { redisFailure } from '@ovelo/shared/redis';
 export const storageQueue = new Queue(QUEUES.storage, { connection: queueConnection });
+storageQueue.on('error', (error) => logger.error({ subsystem: 'storage-queue', code: redisFailure(error) }, 'Queue connection failed'));
 export async function enqueueStorageMigration(userId: string | undefined, storageObjectId: string) {
   const object = await prisma.storageObject.findFirst({
     where: { id: storageObjectId, ...(userId ? { userId } : {}), deletedAt: null },

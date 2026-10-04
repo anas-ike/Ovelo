@@ -4,11 +4,21 @@ import { AuthShell } from './AuthShell';
 import { Field, Input } from '../../components/Field';
 import { Button } from '../../components/Button';
 import { useAuth } from '../../features/auth/AuthProvider';
-import { apiBase } from '../../lib/api';
+import { OAuthButtons } from '../../features/auth/OAuthButtons';
 export function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const oauthErrors: Record<string,string> = {
+    LINK_REQUIRED: 'An account already uses that email. Sign in with your existing method, then return here to connect the provider.',
+    EMAIL_NOT_VERIFIED: 'Verify your email before using provider sign-in.',
+    OAUTH_STATE_INVALID: 'This sign-in attempt expired or could not be verified. Please try again.',
+    ACCOUNT_ALREADY_LINKED: 'This provider is already connected to another account.',
+    ACCOUNT_UNAVAILABLE: 'This account is unavailable.',
+    EMAIL_DOMAIN_REQUIRES_APPROVAL: 'Your email domain requires administrator approval.',
+    OAUTH_FAILED: 'Provider sign-in could not be completed. Please try again.',
+  };
+  const providerError = oauthErrors[new URLSearchParams(location.search).get('oauthError') || ''];
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -20,7 +30,7 @@ export function Login() {
     try {
       await login(email, password);
       const next = new URLSearchParams(location.search).get('next');
-      navigate(next || '/dashboard', { replace: true });
+      navigate(next && next.startsWith('/') && !next.startsWith('//') && !next.includes('\\') ? next : '/dashboard', { replace: true });
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Unable to sign in.');
     } finally {
@@ -29,6 +39,7 @@ export function Login() {
   };
   return (
     <AuthShell title="Welcome back" subtitle="Sign in to your private inventory.">
+      {providerError && <p role="alert" className="form-alert">{providerError}</p>}
       <form className="auth-form" onSubmit={submit}>
         {error && <div className="form-alert">{error}</div>}
         <Field label="Email">
@@ -59,13 +70,8 @@ export function Login() {
         <Button type="submit" loading={loading} className="full-button">
           Sign in
         </Button>
-        <div className="auth-divider">
-          <span>or</span>
-        </div>
-        <a className="oauth-button" href={`${apiBase}/auth/google`}>
-          <span className="google-mark">G</span> Continue with Google
-        </a>
       </form>
+      <OAuthButtons />
       <p className="auth-bottom">
         New to Ovelo? <Link to="/register">Create an account</Link>
       </p>

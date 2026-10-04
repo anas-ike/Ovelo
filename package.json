@@ -1,6 +1,6 @@
 {
   "name": "ovelo",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Ovelo — Know what you own.",
   "workspaces": [
@@ -12,12 +12,12 @@
     "dev:api": "npm --workspace @ovelo/api run dev",
     "dev:worker": "npm --workspace @ovelo/worker run dev",
     "dev:web": "npm --workspace @ovelo/web run dev",
-    "start": "concurrently -n api,worker,web -c blue,magenta,green \"npm:start:api\" \"npm:start:worker\" \"npm:start:web\"",
-    "start:api": "npm --workspace @ovelo/api run start",
-    "start:worker": "npm --workspace @ovelo/worker run start",
-    "start:web": "npm --workspace @ovelo/web run start",
+    "start": "node --import=dotenv/config scripts/start.mjs",
+    "start:api": "node --import=dotenv/config apps/api/dist/server.js",
+    "start:worker": "node --import=dotenv/config apps/worker/dist/index.js",
+    "start:web": "node --import=dotenv/config apps/web/server.mjs",
     "build": "npm run build:shared && npm run build:api && npm run build:worker && npm run build:web",
-    "build:shared": "npm run build --workspace=@ovelo/types --if-present && npm run build --workspace=@ovelo/validation --if-present",
+    "build:shared": "npm run build --workspace=@ovelo/shared && npm run build --workspace=@ovelo/validation",
     "build:api": "npm --workspace @ovelo/api run build",
     "build:worker": "npm --workspace @ovelo/worker run build",
     "build:web": "npm --workspace @ovelo/web run build",
@@ -25,7 +25,7 @@
     "lint": "eslint . --max-warnings=0",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "npm run test --workspaces --if-present",
+    "test": "node --test tests/*.test.mjs && npm run test --workspaces --if-present",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
@@ -52,6 +52,6 @@
     "deepmerge-ts": "^8.0.0"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=20.19.0"
   }
 }

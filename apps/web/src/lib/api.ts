@@ -1,10 +1,11 @@
-export const apiBase = import.meta.env.VITE_API_URL || '/api/v1';
+export const apiBase = (import.meta.env.VITE_API_URL || '/api/v1').replace(/\/+$/, '');
 type ApiOptions = RequestInit & { json?: unknown };
-function csrfToken() {
-  return document.cookie
-    .split('; ')
-    .find((part) => part.startsWith('ovelo_csrf='))
-    ?.split('=')[1];
+async function csrfToken() {
+  const response = await fetch(`${apiBase}/auth/csrf`, { credentials: 'include', cache: 'no-store' });
+  if (response.status === 401) return undefined; // Public registration/login do not yet have a session.
+  if (!response.ok) throw new Error('Unable to verify request protection. Please sign in again.');
+  const result = await response.json() as { data: { csrfToken: string } };
+  return result.data.csrfToken;
 }
 export async function api<T>(path: string, options: ApiOptions = {}): Promise<T> {
   const headers = new Headers(options.headers);
@@ -13,7 +14,7 @@ export async function api<T>(path: string, options: ApiOptions = {}): Promise<T>
     options.body = JSON.stringify(options.json);
   }
   if (options.method && !['GET', 'HEAD', 'OPTIONS'].includes(options.method.toUpperCase())) {
-    const token = csrfToken();
+    const token = await csrfToken();
     if (token) headers.set('x-csrf-token', token);
   }
   const response = await fetch(`${apiBase}${path}`, {

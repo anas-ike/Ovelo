@@ -2,6 +2,7 @@ import type { ErrorRequestHandler, RequestHandler } from 'express';
 import { Prisma } from '@prisma/client';
 import { ZodError } from 'zod';
 import { logger } from '../utils/logger.js';
+import { redisFailure } from '@ovelo/shared/redis';
 export class AppError extends Error {
   constructor(
     public status: number,
@@ -34,7 +35,7 @@ export const errorHandler: ErrorRequestHandler = (error, req, res, next) => {
       .status(409)
       .json({ error: { code: 'CONFLICT', message: 'That value is already in use.', requestId } });
   logger.error(
-    { err: error, requestId, method: req.method, path: req.path },
+    { errorType: error instanceof Error ? error.name : 'UnknownError', code: redisFailure(error) === 'REDIS_UNAVAILABLE' ? 'UNEXPECTED_ERROR' : redisFailure(error), requestId, method: req.method, path: req.path },
     'Unhandled request error',
   );
   return res.status(500).json({

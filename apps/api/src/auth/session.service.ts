@@ -37,7 +37,7 @@ export async function createSession(
   return session.id;
 }
 export async function destroySession(sessionId: string, response: Response) {
-  await prisma.session.delete({ where: { id: sessionId } }).catch(() => undefined);
+  await prisma.session.deleteMany({ where: { id: sessionId } });
   response.clearCookie(env.SESSION_COOKIE_NAME, { path: '/' });
   response.clearCookie('ovelo_csrf', { path: '/' });
 }

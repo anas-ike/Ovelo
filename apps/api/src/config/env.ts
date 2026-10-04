@@ -23,7 +23,7 @@ const raw = z.object({
   DISCORD_CLIENT_ID: z.string().optional(),
   DISCORD_CLIENT_SECRET: z.string().optional(),
   DISCORD_CALLBACK_URL: z.string().url().optional(),
-  DISCORD_SCOPE: z.string().default('identify'),
+  DISCORD_SCOPE: z.enum(['identify', 'identify email']).default('identify'),
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: number.default(587),
   SMTP_SECURE: boolean.default(false),
@@ -78,8 +78,11 @@ if (
     !env.CSRF_ENABLED ||
     !env.EMAIL_VERIFICATION_REQUIRED ||
     !env.APP_URL.startsWith('https://') ||
+    !env.API_URL.startsWith('https://') ||
+    !process.env.REDIS_URL ||
+    [env.GOOGLE_CALLBACK_URL, env.DISCORD_CALLBACK_URL].some((url) => url && !url.startsWith('https://')) ||
     env.SESSION_SECRET.includes('replace-with'))
 )
   throw new Error(
-    'Production requires HTTPS, secure cookies, CSRF, email verification, and a random session secret',
+    'Production requires HTTPS application/API/callback URLs, explicit Redis configuration, secure cookies, CSRF, email verification, and a random session secret',
   );

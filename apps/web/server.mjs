@@ -4,6 +4,7 @@ import { createReadStream, existsSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, join, normalize, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { release } from '@ovelo/shared/release';
 
 const root = resolve(fileURLToPath(new URL('./dist', import.meta.url)));
 const host = '0.0.0.0';
@@ -76,12 +77,16 @@ const server = createServer((request, response) => {
   sendFile(response, file);
 });
 
-server.listen(port, host, () => console.info(`Ovelo web started on ${host}:${port}`));
+server.on('error', (error) => {
+  console.error(JSON.stringify({ service: 'web', code: error.code || 'LISTENER_FAILED', message: 'Web listener failed' }));
+  process.exitCode = 1;
+});
+server.listen(port, host, () => console.info(`Ovelo v${release.version} — ${release.name}: Web running on ${host}:${port}`));
 let stopping = false;
 function shutdown(signal) {
   if (stopping) return;
   stopping = true;
-  console.info(`Ovelo web shutting down (${signal})`);
+  void signal;
   server.close(() => process.exit(0));
   setTimeout(() => process.exit(1), 10000).unref();
 }

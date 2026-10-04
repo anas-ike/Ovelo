@@ -20,9 +20,12 @@ import {
 import { createSession, destroyAllSessions, destroySession } from '../auth/session.service.js';
 import { prisma } from '../database/prisma.js';
 import { AppError } from '../middleware/error.js';
+import { pendingCookie, pendingIdentity } from '../auth/oauth-pending.service.js';
 export const registerController = asyncHandler(async (req, res) => {
   const body = registerSchema.parse(req.body);
-  const user = await register(body);
+  const identity = await pendingIdentity(req.cookies?.[pendingCookie], true);
+  res.clearCookie(pendingCookie, { path: '/' });
+  const user = await register(body, identity);
   res.status(201).json({ data: { user } });
 });
 export const loginController = asyncHandler(async (req, res) => {

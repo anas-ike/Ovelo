@@ -4,6 +4,8 @@
 
 Ovelo is a private, production-oriented digital record of everything a person owns. Ownership records are the core model; receipts, warranties, manuals, photos, repairs, and insurance documents are supporting records attached to them.
 
+Release history: [CHANGELOG.md](CHANGELOG.md) · [machine-readable registry](CHANGELOG.js) · [production verification](docs/production-verification.md) · [release workflow](docs/releases.md).
+
 ## Stack
 
 - **Web:** React 19, TypeScript, Vite, Tailwind CSS, React Router, TanStack Query
@@ -27,7 +29,7 @@ docs           Operations and provider setup
 
 ## Local development
 
-Requirements: Node.js 20+, Docker, and npm 10+.
+Requirements: Node.js >=20.19 (the installed tooling's minimum), and npm. Node 22 LTS is recommended and used for this verification. Docker is optional for local PostgreSQL/Redis.
 
 ```bash
 cp .env.example .env
@@ -48,6 +50,7 @@ The default policy allows Gmail addresses. Business and custom domains must be a
 ```bash
 npm run dev                 # web, API, and worker
 npm run build               # all production builds
+npm start                   # compiled API, worker and built SPA
 npm run typecheck           # every workspace
 npm run lint
 npm run format:check
@@ -98,8 +101,8 @@ All deployment-specific configuration belongs in `.env`; `.env` is ignored by Gi
 Ovelo is designed to run on one Pterodactyl server/container with two allocations:
 
 ```text
-Web:    0.0.0.0:6968  → https://app.ovelo.com
-API:    0.0.0.0:6971  → https://api.ovelo.com
+Web:    0.0.0.0:6968  → https://ovelo.lightsout.in
+API:    0.0.0.0:6971  → https://apiovelo.lightsout.in
 Worker: no public port
 ```
 
@@ -109,28 +112,51 @@ The reverse proxy terminates HTTPS and routes each domain to its allocation. The
 NODE_ENV=production
 PORT=6971
 WEB_PORT=6968
-APP_URL=https://app.ovelo.com
-API_URL=https://api.ovelo.com
-VITE_API_URL=https://api.ovelo.com/api/v1
+APP_URL=https://ovelo.lightsout.in
+API_URL=https://apiovelo.lightsout.in
+VITE_API_URL=https://apiovelo.lightsout.in/api/v1
 COOKIE_SECURE=true
 COOKIE_SAME_SITE=lax
 TRUST_PROXY=true
 STORAGE_PROVIDER=local
 LOCAL_STORAGE_PATH=/home/container/storage
+GOOGLE_CALLBACK_URL=https://apiovelo.lightsout.in/api/v1/auth/google/callback
+DISCORD_CALLBACK_URL=https://apiovelo.lightsout.in/api/v1/auth/discord/callback
+DISCORD_SCOPE=identify
 ```
 
-The final Pterodactyl startup command is:
+Prefer Node **22 LTS** for production. Startup/signal checks passed in isolated Node 22 and Node 25 containers; this repository does not change the configured Pterodactyl runtime. Pterodactyl settings:
+
+```text
+INSTALL_CMD: npm ci --include=dev
+START_CMD:   npm start
+```
+
+Install dependencies during installation or dependency updates, not every restart. Build tools are needed during deployment even when `NODE_ENV=production`, hence `--include=dev`. After updating code/environment, deliberately run:
 
 ```bash
-npm install
 npm run db:generate
-npm run db:deploy
-npm run db:seed
+npm run db:deploy   # explicit migration step, never a restart hook
+npm run db:seed     # initial plans/categories; admin provisioning when configured
 npm run build
-npm start
 ```
 
-`npm start` runs the compiled API, the compiled BullMQ worker, and the static React SPA server together. It does not run migrations. PostgreSQL and Redis can be external services. Keep `/home/container/storage` on persistent container storage; it must not be placed under `apps/web/dist` or any public web root. The API health check is available at `https://api.ovelo.com/health`.
+`npm start` retains the `start:api`, `start:worker`, `start:web` split. A small Node supervisor launches these commands directly, forwards SIGTERM/SIGINT, and stops siblings on failure. It needs no `ps`, `pgrep`, shell process-tree discovery, or global process manager. `concurrently` remains development-only. Both shared runtime packages are compiled before the API/worker; production does not depend on Node's TypeScript stripping.
+
+The existing Nginx routes are `ovelo.lightsout.in → 103.118.182.43:6968` and `apiovelo.lightsout.in → 103.118.182.43:6971`. These routes/allocations stay as configured. `TRUST_PROXY=true` assumes the existing single trusted reverse proxy. Authentication cookies stay host-only, HttpOnly/Secure/SameSite=Lax; the web fetches its session-bound CSRF nonce from `/api/v1/auth/csrf` with credentials and the configured CORS origin.
+
+PostgreSQL and Redis can be external. Redis 7 is recommended (BullMQ minimum recommendation: 6.2). Set `REDIS_URL=redis://...` or `rediss://...` for TLS; percent-encode credentials. The API, queues and worker share explicit hostname/port/database/auth/TLS parsing. TLS uses SNI and certificate verification. Do not disable verification; use `NODE_EXTRA_CA_CERTS` if your provider uses a private CA. API startup checks Redis readiness and security command permissions. Failures remain fail-closed and are logged as safe codes such as `REDIS_AUTH_FAILED`, `REDIS_TLS_FAILED`, `REDIS_ACL_DENIED`, or `ECONNREFUSED`, never the connection URL.
+
+Keep `/home/container/storage` on persistent container storage and outside `apps/web/dist`. Google Drive is optional. Continue configuring SMTP for email verification and ClamAV for PDFs. All other variables in `.env.example` still apply. Only `VITE_*` values may reach the browser; rebuild after changing `VITE_API_URL`.
+
+Checks inside the container:
+
+```bash
+curl http://127.0.0.1:6971/health
+curl -I http://127.0.0.1:6968/dashboard
+```
+
+External checks: `https://ovelo.lightsout.in` and `https://apiovelo.lightsout.in/health`. `/health` is liveness, not a claim that external OAuth/SMTP services are available. See [production diagnostics](docs/production-diagnostics.md) for incident findings and verification boundaries.
 
 ## Provider setup
 

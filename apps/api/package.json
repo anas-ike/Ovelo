@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx watch --env-file=../../.env src/server.ts",
     "build": "tsc -p tsconfig.build.json",
-    "start": "node --env-file-if-exists=../../.env dist/server.js",
+    "start": "DOTENV_CONFIG_PATH=../../.env node --import=dotenv/config dist/server.js",
     "typecheck": "tsc --noEmit",
     "test": "NODE_ENV=test SESSION_SECRET=\"${SESSION_SECRET:-unit-test-session-secret-with-32-chars}\" DATABASE_URL=\"${DATABASE_URL:-postgresql://test:test@localhost:5432/test}\" REDIS_URL=\"${REDIS_URL:-redis://localhost:6379}\" EMAIL_VERIFICATION_REQUIRED=false vitest run"
   },

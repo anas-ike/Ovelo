@@ -717,6 +717,13 @@ footer > :last-child {
 .oauth-button:hover {
   background: var(--surface);
 }
+.oauth-options { margin-top: 28px; display: grid; gap: 10px; }
+.oauth-options .auth-divider { margin: 8px 0 0; }
+.oauth-options button.oauth-button { background: transparent; font: inherit; font-size: 12px; width: 100%; }
+.oauth-button:disabled { opacity: .5; cursor: not-allowed; }
+.provider-mark { font-weight: 700; font-size: 17px; }
+.provider-mark.google { color: #8db2e8; }
+.provider-mark.discord { color: #a7acff; }
 .google-mark {
   font: 700 17px Arial;
   color: #8db2e8;

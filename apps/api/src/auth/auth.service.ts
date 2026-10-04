@@ -7,6 +7,7 @@ import { sendPasswordResetEmail, sendVerificationEmail } from '../services/email
 import { env } from '../config/env.js';
 import { destroyAllSessions } from './session.service.js';
 import type { Response } from 'express';
+import type { PendingIdentity } from './oauth-pending.service.js';
 
 const hashPassword = (password: string) =>
   argon2.hash(password, { type: argon2.argon2id, memoryCost: 65536, timeCost: 3, parallelism: 1 });
@@ -18,7 +19,7 @@ export const publicUserSelect = {
   emailVerifiedAt: true,
   createdAt: true,
 } as const;
-export async function register(input: { name: string; email: string; password: string }) {
+export async function register(input: { name: string; email: string; password: string }, identity?: PendingIdentity | null) {
   await assertEmailAllowed(input.email);
   if (await prisma.user.findUnique({ where: { email: input.email }, select: { id: true } }))
     throw new AppError(
@@ -37,11 +38,12 @@ export async function register(input: { name: string; email: string; password: s
         email: input.email,
         passwordHash: await hashPassword(input.password),
         notificationPreference: { create: {} },
+        ...(identity ? { accounts: { create: identity } } : {}),
       },
       select: publicUserSelect,
     });
     await tx.subscription.create({ data: { userId: created.id, planId: free.id } });
-    if (env.EMAIL_VERIFICATION_REQUIRED)
+    if (env.EMAIL_VERIFICATION_REQUIRED || identity)
       await tx.emailVerification.create({
         data: {
           userId: created.id,
@@ -52,7 +54,7 @@ export async function register(input: { name: string; email: string; password: s
     await tx.securityEvent.create({ data: { userId: created.id, type: 'REGISTRATION' } });
     return created;
   });
-  if (env.EMAIL_VERIFICATION_REQUIRED) await sendVerificationEmail(user.email, token);
+  if (env.EMAIL_VERIFICATION_REQUIRED || identity) await sendVerificationEmail(user.email, token);
   return user;
 }
 export async function verifyEmail(token: string) {

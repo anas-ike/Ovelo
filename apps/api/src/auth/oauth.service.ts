@@ -6,10 +6,18 @@ import { AppError } from '../middleware/error.js';
 import { assertEmailAllowed } from './email-policy.service.js';
 import { createSession } from './session.service.js';
 import { randomToken, hashToken, safeEquals } from '../utils/crypto.js';
-import { ensureRedis } from '../config/redis.js';
+import { ensureRedis, consumeOnce } from '../config/redis.js';
+import { savePendingIdentity } from './oauth-pending.service.js';
+import { z } from 'zod';
 import type { Response } from 'express';
 
 type Provider = 'google' | 'discord';
+export function oauthCapabilities() {
+  return {
+    google: Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET && env.GOOGLE_CALLBACK_URL),
+    discord: Boolean(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET && env.DISCORD_CALLBACK_URL),
+  };
+}
 export interface AuthenticationProvider {
   authorizationUrl(state: string, verifier: string, nonce: string): string;
   exchange(
@@ -84,12 +92,7 @@ class DiscordAuthenticationProvider implements AuthenticationProvider {
       headers: { Authorization: `Bearer ${token.access_token}` },
     });
     if (!result.ok) throw new AppError(401, 'OAUTH_FAILED', 'Could not verify Discord identity.');
-    const profile = (await result.json()) as {
-      id: string;
-      username: string;
-      email?: string;
-      verified?: boolean;
-    };
+    const profile = z.object({ id: z.string().regex(/^\d+$/), username: z.string().min(1), email: z.string().email().nullish(), verified: z.boolean().optional() }).parse(await result.json());
     return {
       id: profile.id,
       name: profile.username.slice(0, 100),
@@ -130,6 +133,7 @@ export async function completeOAuth(
   code: string,
   response: Response,
   userAgent?: string,
+  currentUserId?: string,
 ) {
   if (
     !state ||
@@ -140,7 +144,7 @@ export async function completeOAuth(
     code.length > 2048
   )
     throw new AppError(401, 'OAUTH_STATE_INVALID', 'Sign-in could not be verified.');
-  const transaction = await (await ensureRedis()).getdel(`ovelo:oauth:${hashToken(state)}`);
+  const transaction = await consumeOnce(`ovelo:oauth:${hashToken(state)}`);
   response.clearCookie('ovelo_oauth_state', { path: '/' });
   if (!transaction)
     throw new AppError(401, 'OAUTH_STATE_INVALID', 'Sign-in has expired or was already used.');
@@ -152,6 +156,7 @@ export async function completeOAuth(
   };
   if (flow.provider !== provider)
     throw new AppError(401, 'OAUTH_STATE_INVALID', 'Provider mismatch.');
+  if (flow.linkUserId && flow.linkUserId !== currentUserId) throw new AppError(401, 'OAUTH_STATE_INVALID', 'Sign in again before linking an account.');
   const identity = await providers[provider].exchange(code, flow.verifier, flow.nonce);
   const account = await prisma.account.findUnique({
     where: { provider_providerAccountId: { provider, providerAccountId: identity.id } },
@@ -176,12 +181,10 @@ export async function completeOAuth(
       });
     userId = user.id;
   } else if (!userId) {
-    if (!identity.email)
-      throw new AppError(
-        409,
-        'LINK_REQUIRED',
-        'Create an email account and link Discord in Settings first.',
-      );
+    if (!identity.email) {
+      await savePendingIdentity({ provider, providerAccountId: identity.id }, response);
+      return 'register' as const;
+    }
     await assertEmailAllowed(identity.email);
     if (await prisma.user.findUnique({ where: { email: identity.email }, select: { id: true } }))
       throw new AppError(
@@ -208,11 +211,13 @@ export async function completeOAuth(
   }
   const active = await prisma.user.findFirst({
     where: { id: userId, disabledAt: null, deletedAt: null },
-    select: { id: true },
+    select: { id: true, emailVerifiedAt: true },
   });
   if (!active) throw new AppError(403, 'ACCOUNT_UNAVAILABLE', 'This account is unavailable.');
+  if (!active.emailVerifiedAt) throw new AppError(403, 'EMAIL_NOT_VERIFIED', 'Verify your email before signing in.');
   await prisma.securityEvent.create({
     data: { userId, type: flow.linkUserId ? 'OAUTH_ACCOUNT_LINKED' : 'OAUTH_LOGIN' },
   });
   await createSession(userId, response, { userAgent });
+  return 'dashboard' as const;
 }

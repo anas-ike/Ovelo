@@ -6,7 +6,11 @@ import {
   discordStart,
   googleCallback,
   googleStart,
+  providerCapabilities,
+  pendingProvider,
+  linkProvider,
 } from '../controllers/oauth.controller.js';
+import { csrfTokenController } from '../controllers/csrf.controller.js';
 import {
   registerController,
   loginController,
@@ -24,6 +28,10 @@ import {
   deleteAccountController,
 } from '../controllers/auth.controller.js';
 export const authRouter = Router();
+authRouter.get('/providers', providerCapabilities);
+authRouter.get('/oauth/pending', pendingProvider);
+authRouter.get('/csrf', requireAuth, csrfTokenController);
+authRouter.post('/:provider/link', requireAuth, csrf, rateLimit('oauth-link', 10), linkProvider);
 authRouter.post('/register', rateLimit('register', 5), registerController);
 authRouter.post('/login', rateLimit('login', 10), loginController);
 authRouter.post('/forgot-password', rateLimit('forgot-password', 5), forgotController);
