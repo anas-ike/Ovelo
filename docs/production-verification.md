@@ -194,8 +194,9 @@ Deployment follow-up: deploy this release using the existing workflow, apply rev
 
 ## Git
 
-- Commit hash: the corresponding release commit is resolved with `git log -1 --format=%H -- CHANGELOG.js` (see [release workflow](releases.md) for the self-hash constraint).
-- Push status: NOT PUSHED at report creation. Publication evidence will be finalized after the release commit is pushed; a passing deployment is not implied by a source push.
+- Commit hash: `7f60ff05e06fdbb0f27b65567ff48dc0f154c4ea` — `chore: production verification and auth stabilization`.
+- Push status: **PUSHED to `origin/main`**. `git ls-remote --heads origin main` confirmed the release hash after `git push origin main`. The initial plain `git push` needed an explicit destination because this checkout has no upstream branch.
+- This post-push documentation finalization records the actual release hash and publication result. It does not change the application/version or the FAILED verdict. The release commit remains reproducibly identifiable with `git log -1 --format=%H -- CHANGELOG.js`; the report-finalization commit is identifiable with `git log -1 --format=%H -- docs/production-verification.md`.
 - Working tree and both available historical commits were scanned for credential-bearing URLs/private-key/token signatures and suspicious environment assignments; no candidate production secrets were found. `.env` is not tracked. This is a heuristic scan, not proof against every possible secret format.
 
 ## Final Verdict
