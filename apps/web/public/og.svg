@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#111416"/>
+  <circle cx="918" cy="260" r="230" fill="#26332b"/>
+  <circle cx="918" cy="260" r="162" fill="none" stroke="#607552" stroke-width="2" opacity=".65"/>
+  <circle cx="918" cy="260" r="95" fill="none" stroke="#c8f066" stroke-width="2" opacity=".8"/>
+  <circle cx="918" cy="260" r="42" fill="#c8f066"/>
+  <text x="90" y="255" fill="#edf0ec" font-family="Arial, sans-serif" font-size="86" font-weight="700" letter-spacing="-5">ovelo</text>
+  <text x="94" y="326" fill="#c8f066" font-family="Arial, sans-serif" font-size="32" font-weight="400">Know what you own.</text>
+  <text x="94" y="390" fill="#89918e" font-family="Arial, sans-serif" font-size="22">A private digital record of everything you own.</text>
+</svg>

@@ -1,0 +1,10 @@
+{
+  "name": "Ovelo — What Do I Own?",
+  "short_name": "Ovelo",
+  "description": "A private digital record of everything you own.",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#111416",
+  "theme_color": "#111416",
+  "icons": [{ "src": "/ovelo-mark.svg", "sizes": "64x64", "type": "image/svg+xml", "purpose": "any maskable" }]
+}

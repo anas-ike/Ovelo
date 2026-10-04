@@ -1,0 +1,49 @@
+import { useQuery } from '@tanstack/react-query';
+import { ArrowUpRight, FolderOpen } from 'lucide-react';
+import { get } from '../lib/api';
+import { EmptyState } from '../components/EmptyState';
+import { Loading } from '../components/Loading';
+export function GenericPage({
+  title,
+  description,
+  endpoint,
+}: {
+  title: string;
+  description: string;
+  endpoint?: string;
+}) {
+  const query = useQuery({
+    queryKey: ['generic', endpoint],
+    queryFn: () => get<{ data: unknown }>(endpoint!),
+    enabled: Boolean(endpoint),
+  });
+  return (
+    <div className="generic-page">
+      <div className="generic-head">
+        <div>
+          <span className="eyebrow">OVelo WORKSPACE</span>
+          <h2>{title}</h2>
+          <p>{description}</p>
+        </div>
+        <span className="generic-head-icon">
+          <FolderOpen size={23} />
+        </span>
+      </div>
+      {endpoint && query.isLoading ? (
+        <Loading rows={4} />
+      ) : endpoint && query.error ? (
+        <div className="page-error">Could not load this section.</div>
+      ) : (
+        <EmptyState
+          title={`Your ${title.toLowerCase()} will live here`}
+          description="Add records from the ownership pages and they will appear here, connected to the things they belong to."
+          action={
+            <button className="text-button">
+              Learn how it works <ArrowUpRight size={15} />
+            </button>
+          }
+        />
+      )}
+    </div>
+  );
+}

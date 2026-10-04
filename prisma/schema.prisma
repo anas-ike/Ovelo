@@ -1,0 +1,442 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+enum Role {
+  USER
+  ADMIN
+}
+enum ItemStatus {
+  OWNED
+  LISTED
+  SOLD
+  LOST
+  STOLEN
+  DISPOSED
+  ARCHIVED
+}
+enum DocumentKind {
+  RECEIPT
+  WARRANTY
+  MANUAL
+  REPAIR
+  INSURANCE
+  PURCHASE
+  OTHER
+}
+enum StorageProviderType {
+  GOOGLE_DRIVE
+  BUNNY
+}
+enum MigrationState {
+  PENDING
+  COPYING
+  VERIFYING
+  MIGRATED
+  FAILED
+}
+enum DomainProviderType {
+  GOOGLE
+  BUSINESS
+  CUSTOM
+}
+model User {
+  id String @id @default(uuid()) @db.Uuid
+  email String @unique
+  name String
+  passwordHash String?
+  role Role @default(USER)
+  emailVerifiedAt DateTime?
+  disabledAt DateTime?
+  deletedAt DateTime?
+  storageUsedBytes BigInt @default(0)
+  storageReservedBytes BigInt @default(0)
+  itemCount Int @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  accounts Account[]
+  sessions Session[]
+  verifications EmailVerification[]
+  resets PasswordReset[]
+  items Item[]
+  categories Category[]
+  locations Location[]
+  containers Container[]
+  objects StorageObject[]
+  activities Activity[]
+  notifications Notification[]
+  notificationPreference NotificationPreference?
+  subscription Subscription?
+  securityEvents SecurityEvent[]
+  adminAudits AdminAuditLog[]
+  @@index([createdAt])
+}
+model Account {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @db.Uuid
+  provider String
+  providerAccountId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+model Session {
+  id String @id @default(uuid()) @db.Uuid
+  tokenHash String @unique
+  userId String @db.Uuid
+  csrfHash String
+  admin Boolean @default(false)
+  userAgent String?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, expiresAt])
+}
+model EmailVerification {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @db.Uuid
+  tokenHash String @unique
+  newEmail String?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+}
+model PasswordReset {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @db.Uuid
+  tokenHash String @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+}
+model Item {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @db.Uuid
+  inventoryCode String @unique
+  name String
+  description String?
+  categoryId String? @db.Uuid
+  locationId String? @db.Uuid
+  containerId String? @db.Uuid
+  status ItemStatus @default(OWNED)
+  purchaseDate DateTime?
+  purchasePrice Decimal? @db.Decimal(15,3)
+  estimatedValue Decimal? @db.Decimal(15,3)
+  currency String @default("USD") @db.VarChar(3)
+  store String?
+  serialNumber String?
+  modelNumber String?
+  manufacturer String?
+  notes String?
+  saleDate DateTime?
+  salePrice Decimal? @db.Decimal(15,3)
+  buyerNote String?
+  deletedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  location Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  container Container? @relation(fields: [containerId], references: [id], onDelete: SetNull)
+  documents Document[]
+  photos ItemPhoto[]
+  warranties Warranty[]
+  repairs Repair[]
+  barcodes Barcode[]
+  qrCode QrCode?
+  activities Activity[]
+  relationships ItemRelationship[] @relation("FromItem")
+  relatedTo ItemRelationship[] @relation("ToItem")
+  @@index([userId, deletedAt, createdAt])
+  @@index([userId, status])
+  @@index([userId, categoryId])
+  @@index([userId, locationId])
+  @@index([userId, serialNumber])
+}
+model Category {
+  id String @id @default(uuid()) @db.Uuid
+  userId String? @db.Uuid
+  name String
+  icon String @default("box")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items Item[]
+  @@unique([userId, name])
+}
+model Location {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @db.Uuid
+  name String
+  type String @default("HOME")
+  parentId String? @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent Location? @relation("LocationTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children Location[] @relation("LocationTree")
+  items Item[]
+  containers Container[]
+  @@index([userId])
+}
+model Container {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @db.Uuid
+  name String
+  description String?
+  locationId String? @db.Uuid
+  parentId String? @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  location Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  parent Container? @relation("ContainerTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children Container[] @relation("ContainerTree")
+  items Item[]
+  @@index([userId])
+}
+model ItemRelationship {
+  id String @id @default(uuid()) @db.Uuid
+  fromItemId String @db.Uuid
+  toItemId String @db.Uuid
+  type String
+  createdAt DateTime @default(now())
+  fromItem Item @relation("FromItem", fields: [fromItemId], references: [id], onDelete: Cascade)
+  toItem Item @relation("ToItem", fields: [toItemId], references: [id], onDelete: Cascade)
+  @@unique([fromItemId, toItemId, type])
+}
+model Document {
+  id String @id @default(uuid()) @db.Uuid
+  itemId String @db.Uuid
+  storageObjectId String @unique @db.Uuid
+  kind DocumentKind
+  title String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  storageObject StorageObject @relation(fields: [storageObjectId], references: [id], onDelete: Restrict)
+  receipt Receipt?
+  repairDocuments RepairDocument[]
+  @@index([itemId, kind])
+}
+model Receipt {
+  id String @id @default(uuid()) @db.Uuid
+  documentId String @unique @db.Uuid
+  store String?
+  purchasedAt DateTime?
+  createdAt DateTime @default(now())
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+}
+model Warranty {
+  id String @id @default(uuid()) @db.Uuid
+  itemId String @db.Uuid
+  startDate DateTime
+  endDate DateTime
+  provider String?
+  warrantyNumber String?
+  notificationDays Int[] @default([90,30,7,1])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  @@index([endDate])
+  @@index([itemId])
+}
+model Repair {
+  id String @id @default(uuid()) @db.Uuid
+  itemId String @db.Uuid
+  date DateTime
+  problem String
+  repairShop String?
+  cost Decimal @db.Decimal(15,3)
+  currency String @db.VarChar(3)
+  description String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  documents RepairDocument[]
+  @@index([itemId])
+}
+model RepairDocument {
+  id String @id @default(uuid()) @db.Uuid
+  repairId String @db.Uuid
+  documentId String @db.Uuid
+  createdAt DateTime @default(now())
+  repair Repair @relation(fields: [repairId], references: [id], onDelete: Cascade)
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  @@unique([repairId, documentId])
+}
+model ItemPhoto {
+  id String @id @default(uuid()) @db.Uuid
+  itemId String @db.Uuid
+  storageObjectId String @unique @db.Uuid
+  createdAt DateTime @default(now())
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  storageObject StorageObject @relation(fields: [storageObjectId], references: [id], onDelete: Restrict)
+  @@index([itemId])
+}
+model Barcode {
+  id String @id @default(uuid()) @db.Uuid
+  itemId String @db.Uuid
+  value String
+  format String @default("CODE128")
+  createdAt DateTime @default(now())
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  @@unique([itemId, value])
+  @@index([value])
+}
+model QrCode {
+  id String @id @default(uuid()) @db.Uuid
+  itemId String @unique @db.Uuid
+  code String @unique
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+}
+model Activity {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @db.Uuid
+  itemId String? @db.Uuid
+  action String
+  description String
+  createdAt DateTime @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  item Item? @relation(fields: [itemId], references: [id], onDelete: SetNull)
+  @@index([userId, createdAt])
+  @@index([itemId, createdAt])
+}
+model Notification {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @db.Uuid
+  deduplicationKey String @unique
+  title String
+  body String
+  readAt DateTime?
+  deliveredAt DateTime?
+  createdAt DateTime @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, createdAt])
+}
+model NotificationPreference {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @unique @db.Uuid
+  warrantyEmail Boolean @default(true)
+  loginEmail Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+model StorageObject {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @db.Uuid
+  provider StorageProviderType
+  storageKey String
+  fileId String
+  filename String
+  mimeType String
+  size BigInt
+  checksum String
+  deletedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  document Document?
+  photo ItemPhoto?
+  migrations MigrationJob[]
+  @@unique([provider, storageKey])
+  @@index([userId, deletedAt])
+}
+model StorageAccount {
+  id String @id @default(uuid()) @db.Uuid
+  provider StorageProviderType
+  name String
+  encryptedCredentials String?
+  enabled Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+model MigrationJob {
+  id String @id @default(uuid()) @db.Uuid
+  storageObjectId String @db.Uuid
+  state MigrationState @default(PENDING)
+  sourceProvider StorageProviderType
+  sourceKey String
+  targetProvider StorageProviderType
+  targetKey String?
+  verifiedAt DateTime?
+  sourceDeletedAt DateTime?
+  attempts Int @default(0)
+  errorCode String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  storageObject StorageObject @relation(fields: [storageObjectId], references: [id], onDelete: Cascade)
+  @@index([state])
+}
+model Plan {
+  id String @id @default(uuid()) @db.Uuid
+  code String @unique
+  name String
+  itemLimit Int?
+  storageLimitBytes BigInt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  entitlements Entitlement[]
+  subscriptions Subscription[]
+}
+model Entitlement {
+  id String @id @default(uuid()) @db.Uuid
+  planId String @db.Uuid
+  feature String
+  enabled Boolean @default(true)
+  plan Plan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  @@unique([planId, feature])
+}
+model Subscription {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @unique @db.Uuid
+  planId String @db.Uuid
+  status String @default("ACTIVE")
+  provider String @default("MANUAL")
+  externalId String? @unique
+  expiresAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan Plan @relation(fields: [planId], references: [id], onDelete: Restrict)
+}
+model AdminAuditLog {
+  id String @id @default(uuid()) @db.Uuid
+  adminId String @db.Uuid
+  action String
+  targetType String
+  targetId String?
+  createdAt DateTime @default(now())
+  admin User @relation(fields: [adminId], references: [id], onDelete: Restrict)
+  @@index([createdAt])
+}
+model AllowedEmailDomain {
+  id String @id @default(uuid()) @db.Uuid
+  domain String @unique
+  enabled Boolean @default(true)
+  providerType DomainProviderType
+  createdBy String? @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+model SecurityEvent {
+  id String @id @default(uuid()) @db.Uuid
+  userId String? @db.Uuid
+  type String
+  createdAt DateTime @default(now())
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  @@index([userId, createdAt])
+  @@index([type, createdAt])
+}

@@ -1,0 +1,53 @@
+{
+  "name": "ovelo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Ovelo — Know what you own.",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n api,worker,web -c blue,magenta,green \"npm:dev:api\" \"npm:dev:worker\" \"npm:dev:web\"",
+    "dev:api": "npm --workspace @ovelo/api run dev",
+    "dev:worker": "npm --workspace @ovelo/worker run dev",
+    "dev:web": "npm --workspace @ovelo/web run dev",
+    "build": "npm run build:shared && npm run build:api && npm run build:worker && npm run build:web",
+    "build:shared": "npm run build --workspace=@ovelo/types --if-present && npm run build --workspace=@ovelo/validation --if-present",
+    "build:api": "npm --workspace @ovelo/api run build",
+    "build:worker": "npm --workspace @ovelo/worker run build",
+    "build:web": "npm --workspace @ovelo/web run build",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "eslint . --max-warnings=0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "npm run test --workspaces --if-present",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:studio": "prisma studio"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "@types/node": "^22.10.2",
+    "@typescript-eslint/eslint-plugin": "^8.18.0",
+    "@typescript-eslint/parser": "^8.18.0",
+    "concurrently": "^9.1.2",
+    "eslint": "^9.17.0",
+    "eslint-import-resolver-typescript": "^3.7.0",
+    "eslint-plugin-import": "^2.31.0",
+    "prettier": "^3.4.2",
+    "prisma": "^6.1.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.18.0",
+    "dotenv": "^16.4.7"
+  },
+  "overrides": {
+    "deepmerge-ts": "^8.0.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

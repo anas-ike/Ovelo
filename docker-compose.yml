@@ -1,0 +1,65 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ovelo
+      POSTGRES_PASSWORD: ovelo
+      POSTGRES_DB: ovelo
+    ports:
+      - '127.0.0.1:${POSTGRES_PORT:-55433}:5432'
+    volumes:
+      - ovelo-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ovelo -d ovelo']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+  redis:
+    image: redis:7-alpine
+    ports:
+      - '127.0.0.1:${REDIS_PORT:-56379}:6379'
+    volumes:
+      - ovelo-redis:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+  api:
+    build:
+      context: .
+      target: api
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://ovelo:ovelo@postgres:5432/ovelo?schema=public
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    ports:
+      - '4000:4000'
+  worker:
+    build:
+      context: .
+      target: worker
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://ovelo:ovelo@postgres:5432/ovelo?schema=public
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+  web:
+    build:
+      context: .
+      target: web
+      args:
+        VITE_API_URL: /api/v1
+    depends_on:
+      - api
+    ports:
+      - '5173:80'
+
+volumes:
+  ovelo-postgres:
+  ovelo-redis:

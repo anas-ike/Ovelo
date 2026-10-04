@@ -1,0 +1,50 @@
+{
+  "name": "@ovelo/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --env-file=../../.env src/server.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "tsx --env-file=../../.env src/server.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "NODE_ENV=test SESSION_SECRET=\"${SESSION_SECRET:-unit-test-session-secret-with-32-chars}\" DATABASE_URL=\"${DATABASE_URL:-postgresql://test:test@localhost:5432/test}\" REDIS_URL=\"${REDIS_URL:-redis://localhost:6379}\" EMAIL_VERIFICATION_REQUIRED=false vitest run"
+  },
+  "dependencies": {
+    "@ovelo/shared": "*",
+    "@ovelo/types": "*",
+    "@ovelo/validation": "*",
+    "@prisma/client": "^6.1.0",
+    "argon2": "^0.41.1",
+    "bullmq": "^5.34.4",
+    "bwip-js": "^4.5.1",
+    "compression": "^1.7.5",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "helmet": "^8.0.0",
+    "ioredis": "^5.4.2",
+    "jose": "^6.0.0",
+    "multer": "^2.0.2",
+    "nodemailer": "^10.0.14",
+    "pdfkit": "^0.17.1",
+    "pino": "^9.6.0",
+    "qrcode": "^1.5.4",
+    "sharp": "^0.35.5",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/compression": "^1.7.5",
+    "@types/cookie-parser": "^1.4.8",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/multer": "^2.0.0",
+    "@types/nodemailer": "^6.4.17",
+    "@types/pdfkit": "^0.17.0",
+    "@types/qrcode": "^1.5.5",
+    "@types/supertest": "^6.0.2",
+    "supertest": "^7.0.0",
+    "vitest": "^4.1.11"
+  }
+}
