@@ -1,5 +1,16 @@
 # Provider configuration
 
+## Local storage
+
+For the current Pterodactyl deployment, use:
+
+```dotenv
+STORAGE_PROVIDER=local
+LOCAL_STORAGE_PATH=/home/container/storage
+```
+
+The local provider is behind the same `StorageProvider` and `StorageManager` interfaces as the remote providers. It creates the directory with restricted permissions, generates random storage keys, rejects traversal/absolute keys, and stores files outside the frontend build. Upload validation and quota enforcement happen before the provider is called. Keep the configured path on persistent container storage and do not expose it through Nginx.
+
 ## SMTP
 
 Set `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, and `SMTP_FROM_NAME`. Use port 587 with STARTTLS (`SMTP_SECURE=false`) or the provider's documented implicit TLS port. Verify registration, email verification, login notification, and password-reset delivery before production launch.

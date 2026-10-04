@@ -1,7 +1,9 @@
 import { createHash } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
+import { isAbsolute, relative, resolve } from 'node:path';
 import { prisma } from './database.js';
 import { logger } from './logger.js';
-type Provider = 'GOOGLE_DRIVE' | 'BUNNY';
+type Provider = 'LOCAL' | 'GOOGLE_DRIVE' | 'BUNNY';
 const env = process.env;
 async function googleToken() {
   const response = await fetch('https://oauth2.googleapis.com/token', {
@@ -18,6 +20,16 @@ async function googleToken() {
   return ((await response.json()) as { access_token: string }).access_token;
 }
 async function readObject(provider: Provider, fileId: string, key: string) {
+  if (provider === 'LOCAL') {
+    const root = resolve(env.LOCAL_STORAGE_PATH || '/home/container/storage');
+    const target = resolve(root, key);
+    const relativePath = relative(root, target);
+    if (!relativePath || relativePath.startsWith('..') || isAbsolute(relativePath))
+      throw new Error('source-key-invalid');
+    return readFile(target).catch(() => {
+      throw new Error('source-download-failed');
+    });
+  }
   if (provider === 'GOOGLE_DRIVE') {
     const token = await googleToken();
     const response = await fetch(

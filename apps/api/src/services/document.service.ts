@@ -70,11 +70,14 @@ export async function downloadDocument(userId: string, documentId: string) {
     },
   });
   if (!document) throw new AppError(404, 'DOCUMENT_NOT_FOUND', 'Document not found.');
+  const downloaded = await providerFor(document.storageObject.provider).download(
+    document.storageObject.fileId,
+    document.storageObject.storageKey,
+  );
   return {
-    ...(await providerFor(document.storageObject.provider).download(
-      document.storageObject.fileId,
-      document.storageObject.storageKey,
-    )),
+    ...downloaded,
+    filename: document.storageObject.filename,
+    mimeType: document.storageObject.mimeType,
     title: document.title,
   };
 }

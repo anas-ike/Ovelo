@@ -5,7 +5,7 @@ export interface StorageUpload {
   checksum: string;
 }
 export interface StorageObjectResult {
-  provider: 'GOOGLE_DRIVE' | 'BUNNY';
+  provider: 'LOCAL' | 'GOOGLE_DRIVE' | 'BUNNY';
   storageKey: string;
   fileId: string;
   filename: string;

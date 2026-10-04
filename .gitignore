@@ -11,5 +11,7 @@ uploads/
 prisma/*.db
 prisma/*.db-journal
 apps/api/storage/
+/storage/
+/local-storage/
 apps/api/keys/
 generated/

@@ -1,3 +1,5 @@
+import 'dotenv/config';
+
 const redisUrl = process.env.REDIS_URL;
 const databaseUrl = process.env.DATABASE_URL;
 if (!redisUrl || !databaseUrl)

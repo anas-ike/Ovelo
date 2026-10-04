@@ -33,11 +33,16 @@ services:
     environment:
       DATABASE_URL: postgresql://ovelo:ovelo@postgres:5432/ovelo?schema=public
       REDIS_URL: redis://redis:6379
+      PORT: 4000
+      STORAGE_PROVIDER: local
+      LOCAL_STORAGE_PATH: /home/container/storage
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
     ports:
       - '4000:4000'
+    volumes:
+      - ovelo-storage:/home/container/storage
   worker:
     build:
       context: .
@@ -46,9 +51,13 @@ services:
     environment:
       DATABASE_URL: postgresql://ovelo:ovelo@postgres:5432/ovelo?schema=public
       REDIS_URL: redis://redis:6379
+      STORAGE_PROVIDER: local
+      LOCAL_STORAGE_PATH: /home/container/storage
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
+    volumes:
+      - ovelo-storage:/home/container/storage
   web:
     build:
       context: .
@@ -63,3 +72,4 @@ services:
 volumes:
   ovelo-postgres:
   ovelo-redis:
+  ovelo-storage:

@@ -15,11 +15,11 @@ RUN npx prisma generate
 FROM base AS api
 RUN npm run build:shared && npm run build:api
 EXPOSE 4000
-CMD ["node", "--import", "tsx", "apps/api/src/server.ts"]
+CMD ["node", "apps/api/dist/server.js"]
 
 FROM base AS worker
 RUN npm run build:shared && npm run build:worker
-CMD ["node", "--import", "tsx", "apps/worker/src/index.ts"]
+CMD ["node", "apps/worker/dist/index.js"]
 
 FROM base AS web-build
 ARG VITE_API_URL=/api/v1

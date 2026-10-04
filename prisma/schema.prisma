@@ -28,6 +28,7 @@ enum DocumentKind {
   OTHER
 }
 enum StorageProviderType {
+  LOCAL
   GOOGLE_DRIVE
   BUNNY
 }

@@ -2,7 +2,14 @@ import { app } from './app.js';
 import { env } from './config/env.js';
 import { prisma } from './database/prisma.js';
 import { logger } from './utils/logger.js';
-const server = app.listen(env.PORT, () => logger.info({ port: env.PORT }, 'Ovelo API listening'));
+import { providerFor } from './storage/storage-manager.js';
+if (env.STORAGE_PROVIDER === 'local') providerFor('LOCAL');
+const server = app.listen(env.PORT, '0.0.0.0', () =>
+  logger.info(
+    { host: '0.0.0.0', port: env.PORT, storageProvider: env.STORAGE_PROVIDER },
+    'Ovelo API started',
+  ),
+);
 const shutdown = async (signal: string) => {
   logger.info({ signal }, 'Shutting down');
   server.close(async () => {

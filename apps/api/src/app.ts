@@ -18,7 +18,7 @@ import { reportRouter } from './routes/report.routes.js';
 import { qrRouter } from './routes/qr.routes.js';
 export const app = express();
 app.disable('x-powered-by');
-app.set('trust proxy', process.env.TRUST_PROXY === 'true' ? 1 : false);
+app.set('trust proxy', env.TRUST_PROXY ? 1 : false);
 app.use(requestId);
 app.use(
   helmet({

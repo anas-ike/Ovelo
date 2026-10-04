@@ -65,11 +65,15 @@ workers.forEach((worker) =>
     logger.error({ jobId: job?.id, err: error }, 'Background job failed'),
   ),
 );
-logger.info({ queues: Object.values(QUEUES) }, 'Ovelo workers listening');
-const shutdown = async () => {
+logger.info({ queues: Object.values(QUEUES) }, 'Ovelo worker started');
+let shuttingDown = false;
+const shutdown = async (signal: string) => {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  logger.info({ signal }, 'Ovelo worker shutting down');
   await Promise.all(workers.map((worker) => worker.close()));
   await prisma.$disconnect();
   process.exit(0);
 };
-process.on('SIGINT', () => void shutdown());
-process.on('SIGTERM', () => void shutdown());
+process.on('SIGINT', () => void shutdown('SIGINT'));
+process.on('SIGTERM', () => void shutdown('SIGTERM'));
