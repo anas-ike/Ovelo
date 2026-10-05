@@ -101,4 +101,6 @@ If the primary-owner email is changed, verify the new address before it takes ef
 
 - Secret checks: **PASS** — 75 intended staged files, actual configured-credential matching, secret signatures/credential-bearing external URLs, deployed frontend and inspected startup logs. Working-tree/all-local-history heuristic scan found no candidates.
 - `.env` is ignored by `.gitignore:3` and untracked; it is excluded from the index. No credentials, provider payloads, tokens, screenshots or raw logs are published.
-- Source publication is being finalized. The release commit identifier will be recorded after Git confirms publication.
+- Deployed release source commit: **`b5fbdf5941107ccc5d12cf1b5e4e7049361e2554`** — `feat: complete ownership records and administrator security`.
+- **PUSHED to `origin/main`**; the remote branch hash was verified after pushing. All changed/new release files were compared with the deployed source and matched. Final report synchronization leaves the environment file untouched.
+- This documentation-only finalization records the published source hash and verified results. Its commit is reproducibly identified with `git log -1 --format=%H -- docs/production-verification.md`.
