@@ -60,6 +60,13 @@ No private data, API response, session, token, user ID, document, item, location
 - **Google/Discord consent:** BLOCKED — authorized account unavailable; existing OAuth initialization/security behavior was preserved.
 - **Lighthouse:** BLOCKED — tool unavailable; no performance score is claimed. Static output shows route-level code splitting, public source HTML, a fixed-size branded image, and the remaining large vendor chunk is documented for future work.
 
+### v0.3.0 publication safety
+
+- Release commit: **`07ebc52f46b22f8e1862d115f040a458ccdbc2b7`** — `feat: complete seo and web quality optimization`.
+- Push: **PASS** — `origin/main` verified at the same hash.
+- Secret scan: **PASS** — staged configured-value/signature/URL checks, deployed artifacts, and recent logs found no candidates. A working-tree/all-local-history heuristic scan also found no candidates.
+- `.env`: ignored by `.gitignore:3`, untracked, and absent from the index. No credentials, OAuth tokens, recovery tokens, private records, or private logs are included.
+
 Ovelo v0.2.0 — Ownership Records and Administrator Security
 
 Date: 2026-10-05
