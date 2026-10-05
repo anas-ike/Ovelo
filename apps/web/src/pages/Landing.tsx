@@ -4,6 +4,9 @@ import { Logo } from '../components/Logo';
 export function Landing() {
   return (
     <div className="landing">
+      <a className="skip-link" href="#main-content">
+        Skip to content
+      </a>
       <header className="landing-nav">
         <Logo />
         <div className="landing-links">
@@ -17,7 +20,7 @@ export function Landing() {
           </Link>
         </div>
       </header>
-      <main>
+      <main id="main-content">
         <section className="hero">
           <div className="hero-copy">
             <div className="kicker">
@@ -178,7 +181,10 @@ export function Landing() {
       <footer>
         <Logo />
         <span>Ovelo — Know what you own.</span>
-        <nav><Link to="/terms">Terms</Link> · <Link to="/privacy">Privacy</Link> · <Link to="/how-it-works">How it works</Link></nav>
+        <nav>
+          <Link to="/terms">Terms</Link> · <Link to="/privacy">Privacy</Link> ·{' '}
+          <Link to="/how-it-works">How it works</Link>
+        </nav>
         <span>© {new Date().getFullYear()} Ovelo</span>
       </footer>
     </div>

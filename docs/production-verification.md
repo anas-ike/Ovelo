@@ -1,5 +1,65 @@
 # Ovelo Production Verification
 
+Ovelo v0.3.0 — SEO and Web Quality Optimization
+
+This release adds crawlable public HTML, route-aware metadata, sitemap/robots handling, private-route indexing protection, truthful schema, branded social metadata, mobile/accessibility improvements, and private route code splitting. The v0.2.0 deployment evidence remains below; final v0.3.0 SEO verification is recorded in `docs/seo/README.md` and the current changelog entry.
+
+## v0.3.0 SEO/public verification
+
+Date: 2026-10-05
+
+### Implemented
+
+- `apps/web/public/sitemap.xml` contains exactly `/`, `/how-it-works`, `/terms`, and `/privacy`, all on `https://ovelo.lightsout.in` with no query strings.
+- `apps/web/public/robots.txt` allows the public site, references the sitemap, and disallows authentication, private application, administrator, identifier, and API paths without blocking assets.
+- `scripts/generate-public-pages.mjs` generates crawler/social-readable HTML for each public route from the existing app content. React remains the runtime and route behavior is preserved.
+- Public metadata is centralized in `apps/web/src/seo-pages.json`; runtime `SeoHead` keeps client-side navigation aligned. Titles, descriptions, canonicals, robots, Open Graph, Twitter, and homepage JSON-LD are truthful and use HTTPS production URLs.
+- Added `apps/web/public/og-image.png`, a 1200×630 branded Ovelo image derived from the existing `og.svg` artwork.
+- Private and API responses are non-indexable. Unknown HTML routes and missing static assets return 404 rather than generic SPA soft 404s. Existing admin HTML/bundle gates and API authorization remain in place.
+- Private/authentication modules are lazy-loaded; public routes avoid an unnecessary authenticated `/auth/me` request; public navigation works at narrow widths; skip links, visible focus, dialog/loading semantics, and muted-text contrast were improved.
+- Added `docs/seo/README.md`, `docs/seo/backlink-strategy.md`, and source tests in `tests/seo.test.mjs`.
+
+### Local verification
+
+| Check                            | Result                                                                                  |
+| -------------------------------- | --------------------------------------------------------------------------------------- |
+| `npm run build`                  | PASS — v0.3.0 build, static public pages and route chunks generated                     |
+| `npm run typecheck`              | PASS                                                                                    |
+| `npm run lint`                   | PASS                                                                                    |
+| `npm test`                       | PASS — 10 root tests; API 14 passed / 29 skipped in default environment                 |
+| `node --test tests/seo.test.mjs` | PASS — 3 tests                                                                          |
+| `npm audit --omit=dev`           | PASS — 0 vulnerabilities                                                                |
+| `git diff --check`               | PASS                                                                                    |
+| Chromium public browser checks   | PASS — 32 checks across 8 widths and 4 pages; no horizontal overflow; one H1 per page   |
+| `npm run format:check`           | FAIL — existing repository-wide Prettier drift in 80 files; changed SEO files formatted |
+| Lighthouse                       | BLOCKED — not installed in the environment; no score claimed                            |
+
+### Production public verification
+
+The existing production workflow deployed v0.3.0 without changing networking or allocation configuration. Restart verification passed: API health 200/version 0.3.0, web/API/worker started, ports unchanged, no new runtime shutdown failure, and no configured secret found in inspected logs.
+
+Real public endpoint checks returned:
+
+| Endpoint/check                             | Result                                                                          |
+| ------------------------------------------ | ------------------------------------------------------------------------------- |
+| `/`, `/how-it-works`, `/terms`, `/privacy` | PASS — 200, index/follow, source H1/title/description/canonical/social metadata |
+| `/sitemap.xml`                             | PASS — 200 XML, exactly 4 canonical public URLs                                 |
+| `/robots.txt`                              | PASS — 200 text, correct sitemap reference and private-route rules              |
+| `/og-image.png`                            | PASS — 200 `image/png`, generated 1200×630 asset                                |
+| `/login`, `/dashboard`, `/admin/login`     | PASS — 200 with `X-Robots-Tag: noindex, nofollow`                               |
+| Unknown HTML route                         | PASS — 404                                                                      |
+| Public internal links/assets               | PASS — 9 unique targets resolved without HTTP failure                           |
+| `https://apiovelo.lightsout.in/health`     | PASS — 200, v0.3.0; API `X-Robots-Tag: noindex, nofollow`                       |
+
+No private data, API response, session, token, user ID, document, item, location, administrator data, or production credential was added to public HTML, sitemap, robots, schema, documentation, or social metadata.
+
+### External/manual status
+
+- **Search Console: MANUAL ACTION REQUIRED.** An owner must add the URL-prefix property `https://ovelo.lightsout.in/`, complete Google’s HTML-tag or DNS verification, and submit `https://ovelo.lightsout.in/sitemap.xml`. No Google credentials or verification token is stored here.
+- **Backlinks: no acquisitions claimed.** The strategy is documented under `docs/seo/backlink-strategy.md`.
+- **Google/Discord consent:** BLOCKED — authorized account unavailable; existing OAuth initialization/security behavior was preserved.
+- **Lighthouse:** BLOCKED — tool unavailable; no performance score is claimed. Static output shows route-level code splitting, public source HTML, a fixed-size branded image, and the remaining large vendor chunk is documented for future work.
+
 Ovelo v0.2.0 — Ownership Records and Administrator Security
 
 Date: 2026-10-05
@@ -24,18 +84,18 @@ The existing architecture, domains, proxy configuration and allocations were pre
 
 ## Build and dedicated-service checks
 
-| Check | Observed result |
-| --- | --- |
-| Production-environment build | PASS — shared/API/worker/web; root version and HTML/API metadata `0.2.0` |
-| Typecheck / lint / whitespace | PASS — `npm run typecheck`, `npm run lint`, `git diff --check` |
-| Dedicated automated tests | PASS — **7 root + 43 API = 50 tests; none skipped** |
-| Dependency audit | PASS — `npm audit --omit=dev`, zero reported vulnerabilities |
-| Dedicated migration / seed | PASS — all three migrations, plans/categories and QR entitlement |
-| Ownership isolation | PASS — foreign item, document, activity, warranty/repair IDs and attachment IDs rejected |
-| Record validation | PASS — invalid dates, unsupported uploads, invalid Maps hosts/coordinates and identifier expiry/replay rejected |
-| Admin authorization | PASS — separate sessions, CSRF, OWNER restrictions, main-owner protection, role/status/session revocation and audit |
-| Recovery | PASS — normal/admin ticket separation, short-password rejection, atomic single-use consumption and session revocation |
-| Interactive CLI | PASS — real pseudo-terminal on dedicated DB; no input echo; policy, password hash, audit and session/reset-ticket revocation verified |
+| Check                         | Observed result                                                                                                                       |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Production-environment build  | PASS — shared/API/worker/web; root version and HTML/API metadata `0.2.0`                                                              |
+| Typecheck / lint / whitespace | PASS — `npm run typecheck`, `npm run lint`, `git diff --check`                                                                        |
+| Dedicated automated tests     | PASS — **7 root + 43 API = 50 tests; none skipped**                                                                                   |
+| Dependency audit              | PASS — `npm audit --omit=dev`, zero reported vulnerabilities                                                                          |
+| Dedicated migration / seed    | PASS — all three migrations, plans/categories and QR entitlement                                                                      |
+| Ownership isolation           | PASS — foreign item, document, activity, warranty/repair IDs and attachment IDs rejected                                              |
+| Record validation             | PASS — invalid dates, unsupported uploads, invalid Maps hosts/coordinates and identifier expiry/replay rejected                       |
+| Admin authorization           | PASS — separate sessions, CSRF, OWNER restrictions, main-owner protection, role/status/session revocation and audit                   |
+| Recovery                      | PASS — normal/admin ticket separation, short-password rejection, atomic single-use consumption and session revocation                 |
+| Interactive CLI               | PASS — real pseudo-terminal on dedicated DB; no input echo; policy, password hash, audit and session/reset-ticket revocation verified |
 
 Tests used explicitly isolated PostgreSQL/Redis services with `RUN_DB_TESTS=true`; they were never run against the production database. The provider and SMTP boundaries in the authentication suite are simulated, while database sessions, Redis state, JWT verification and authorization checks are real. Google/Discord administrator linking was tested with a different normal-user session present.
 
@@ -66,24 +126,24 @@ Diagnostics reproduced intermittent geometric QR detection failures on clean gen
 - Existing ignored environment transferred securely to its deployment location; existing networking/startup workflow retained. Install, explicit Prisma generation and production build passed in the container. Install-script policy warnings were retained without blanket approval.
 - Container restart: PASS — v0.2.0 API health 200, web/API listeners and worker started, port bindings unchanged, no new `ps`/ChildProcess shutdown failure, no configured secret found in inspected startup logs.
 
-| Real production check | Observed result |
-| --- | --- |
-| Login/signup layouts and release metadata | PASS — desktop 1440×1000 and mobile 390×844; Google/Discord/email-password visible; correct HTTPS API destination |
-| Public help/Terms/Privacy and admin login/recovery layouts | PASS — both viewports, no overflow or uncaught page errors |
-| Administrator HTML protection | PASS — 9 direct routes redirect to `/admin/login` before protected content |
-| Administrator API protection | PASS — 10 unauthenticated endpoints return 401 |
-| Lazy administrator bundle / gate | PASS — bundle redirects to login; unsigned gate request rejected |
-| Google authorization initialization | PASS — provider page reached; production callback, expiring Redis state, secure HttpOnly cookie, PKCE and nonce validated |
-| Discord authorization initialization | PASS — provider page reached; production callback, identify scope, expiring Redis state and secure HttpOnly cookie validated |
-| OAuth negative security | PASS — actual invalid provider-code exchanges, bad state, consumed/replayed state, controlled expiry of probe-owned transactions, no session issued |
-| Request protection | PASS — credentialed origin, foreign-origin mutation rejection, unauthenticated API/CSRF rejection, invalid login, rate limit and Retry-After |
-| Successful Google/Discord consent | **BLOCKED — authorized browser/account unavailable** |
-| Authenticated production records/scanning/admin/logout | **BLOCKED — actual authenticated account unavailable** |
-| Primary administrator provisioning | **FAIL — `ADMIN_PASSWORD` does not satisfy existing 16–128-character policy** |
-| SMTP connection/authentication | **FAIL — configured server reached, authentication rejected with `EAUTH` on `AUTH PLAIN`** |
-| SMTP recovery delivery / inbox receipt | BLOCKED — SMTP authentication failed |
-| PDF success | BLOCKED — `CLAMAV_HOST` absent; scanning remains fail-closed |
-| Optional Places API | NOT CONFIGURED — `GOOGLE_MAPS_API_KEY` absent; manual address search/selection and Maps links remain available |
+| Real production check                                      | Observed result                                                                                                                                     |
+| ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Login/signup layouts and release metadata                  | PASS — desktop 1440×1000 and mobile 390×844; Google/Discord/email-password visible; correct HTTPS API destination                                   |
+| Public help/Terms/Privacy and admin login/recovery layouts | PASS — both viewports, no overflow or uncaught page errors                                                                                          |
+| Administrator HTML protection                              | PASS — 9 direct routes redirect to `/admin/login` before protected content                                                                          |
+| Administrator API protection                               | PASS — 10 unauthenticated endpoints return 401                                                                                                      |
+| Lazy administrator bundle / gate                           | PASS — bundle redirects to login; unsigned gate request rejected                                                                                    |
+| Google authorization initialization                        | PASS — provider page reached; production callback, expiring Redis state, secure HttpOnly cookie, PKCE and nonce validated                           |
+| Discord authorization initialization                       | PASS — provider page reached; production callback, identify scope, expiring Redis state and secure HttpOnly cookie validated                        |
+| OAuth negative security                                    | PASS — actual invalid provider-code exchanges, bad state, consumed/replayed state, controlled expiry of probe-owned transactions, no session issued |
+| Request protection                                         | PASS — credentialed origin, foreign-origin mutation rejection, unauthenticated API/CSRF rejection, invalid login, rate limit and Retry-After        |
+| Successful Google/Discord consent                          | **BLOCKED — authorized browser/account unavailable**                                                                                                |
+| Authenticated production records/scanning/admin/logout     | **BLOCKED — actual authenticated account unavailable**                                                                                              |
+| Primary administrator provisioning                         | **FAIL — `ADMIN_PASSWORD` does not satisfy existing 16–128-character policy**                                                                       |
+| SMTP connection/authentication                             | **FAIL — configured server reached, authentication rejected with `EAUTH` on `AUTH PLAIN`**                                                          |
+| SMTP recovery delivery / inbox receipt                     | BLOCKED — SMTP authentication failed                                                                                                                |
+| PDF success                                                | BLOCKED — `CLAMAV_HOST` absent; scanning remains fail-closed                                                                                        |
+| Optional Places API                                        | NOT CONFIGURED — `GOOGLE_MAPS_API_KEY` absent; manual address search/selection and Maps links remain available                                      |
 
 Local verification discovered inherited shell variables taking precedence over `.env`. Real production probes were repeated with `DOTENV_CONFIG_OVERRIDE=true` so the supplied file was authoritative; dedicated tests explicitly kept that override unset. Credential values were never included in reports or tool output.
 

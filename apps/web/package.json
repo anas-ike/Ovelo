@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && vite build && node ../../scripts/generate-public-pages.mjs",
     "start": "DOTENV_CONFIG_PATH=../../.env node --import=dotenv/config server.mjs",
     "preview": "vite preview --host 0.0.0.0",
     "typecheck": "tsc --noEmit"

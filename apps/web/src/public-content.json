@@ -1,0 +1,108 @@
+{
+  "help": [
+    [
+      "Add what you own",
+      "Create an ownership record with its name, category, brand, model, serial number, condition, purchase details and value. Edit it whenever the details change."
+    ],
+    [
+      "Store supporting documents",
+      "Attach receipts, manuals, warranty paperwork and repair records during creation or from the Documents tab. Supported images are processed for safety; PDFs require malware scanning."
+    ],
+    [
+      "Track warranties",
+      "Record the provider, plan, policy number, coverage and dates. The item shows active, expiring or expired coverage using the details you entered."
+    ],
+    [
+      "Track repairs",
+      "Keep a dated repair history with provider, cost, notes and related documents. Updates and removals are recorded in item activity."
+    ],
+    [
+      "Track locations",
+      "Choose a saved place, search an address or paste a Google Maps link. The Locations page groups your own records. Places search depends on server configuration; manual addresses and Maps links remain available."
+    ],
+    [
+      "Use QR and barcodes",
+      "Generate an opaque QR or Code 128 label and download PNG or SVG. Scan locally with your camera, upload a code image or enter a code manually. A code never grants access to another person’s inventory."
+    ],
+    [
+      "Keep ownership history organized",
+      "Item activity records changes to your records, documents, warranties, repairs, location and identification. Archive a record when it is no longer current."
+    ]
+  ],
+  "terms": [
+    [
+      "The service",
+      "Ovelo helps you maintain private ownership records, item details, documents, warranties, repairs, locations and identification labels. Your entries are organizational records, not proof of legal ownership, professional advice or an insurance valuation."
+    ],
+    [
+      "Your account",
+      "Provide accurate account information, keep your sign-in methods secure and notify us of suspected unauthorized access. Do not share administrator credentials or attempt to access records belonging to someone else."
+    ],
+    [
+      "Acceptable use",
+      "Do not upload malware, executable content, unlawful material or material that violates another person’s rights. Do not probe, disrupt or bypass authorization, quotas, rate limits or other safeguards."
+    ],
+    [
+      "Uploaded content",
+      "You remain responsible for your content and having permission to store it. You authorize Ovelo to process and store that content to provide the service. Avoid uploading secrets or information you do not need to retain."
+    ],
+    [
+      "Limits and backups",
+      "File types, sizes, storage and item counts are limited by the configured plan and safety controls. Unsupported or unsafe files may be rejected. Keep independent copies of important documents; Ovelo is not your sole backup."
+    ],
+    [
+      "Suspension and termination",
+      "Access may be restricted for abuse, security reasons or violations of these terms. You may request deletion through account controls or contact support. Retention and backup limitations are explained in the Privacy Policy."
+    ],
+    [
+      "Availability",
+      "Service availability, reminders, integrations and third-party authentication depend on network and provider availability. Features may change and uninterrupted service or successful delivery of every notification is not guaranteed."
+    ],
+    [
+      "Liability",
+      "To the extent permitted by applicable law, the service is provided as available and we do not warrant that it will be error-free or meet every purpose. We are not responsible for indirect losses arising from reliance on user-entered records. Nothing here excludes liability or rights that cannot legally be excluded."
+    ],
+    [
+      "Changes and contact",
+      "We may update these terms as the service changes. The last-updated date identifies this version. Contact contact@lightsout.in with service or account questions. No legal certification or regulatory compliance endorsement is claimed."
+    ]
+  ],
+  "privacy": [
+    [
+      "Account and authentication information",
+      "Ovelo stores your account name, email, verification status and role. Passwords are stored as password hashes. Google sign-in uses a verified identity/email; Discord uses the identify scope by default. Provider account identifiers are stored for explicit linking. OAuth code exchanges take place server-side; provider secrets and access tokens are not exposed to frontend JavaScript."
+    ],
+    [
+      "Your inventory and documents",
+      "The service stores the item details you supply, values, locations and optional coordinates/Maps links, warranties, repairs, supporting files and ownership activity. File metadata includes name, type, size and checksum. Image processing removes metadata such as EXIF; document content remains private to authorized accounts."
+    ],
+    [
+      "Sessions, cookies and security",
+      "Random HttpOnly cookies identify database-backed sessions. Session-token and CSRF hashes, expiry and optional user-agent information are stored server-side. Administrator sessions are separate and have shorter lifetimes. OAuth state and rate-limit entries use Redis with expiration; rate-limit subjects are HMAC-derived rather than public raw identifiers. The host-only web administrator gate is bound to the live administrator session."
+    ],
+    [
+      "Logs and administration",
+      "Operational errors, request identifiers, login/security events and item activity help operate and secure the service. Administrator audit entries record actor, action, target, time, result, request ID and user agent where provided. Audit logging excludes passwords, session cookies, reset tokens, provider tokens and connection credentials. Hosting/reverse-proxy infrastructure may maintain its own request logs."
+    ],
+    [
+      "Email",
+      "Configured SMTP is used for verification and password-recovery messages. Recovery tickets are expiring, hashed server-side and consumed once. The SMTP provider processes the recipient and message to deliver the email. Availability is dependent on actual mail configuration."
+    ],
+    [
+      "Infrastructure and optional integrations",
+      "The deployment uses PostgreSQL for metadata, Redis for security/queues and the configured storage provider for files. Production currently uses external Aiven PostgreSQL, TLS Redis and local container storage. Google/Discord receive information during sign-in. Google Maps/Places may receive a search when optional server-side search is configured or you open a Maps link. Optional Drive/Bunny storage applies only when configured."
+    ],
+    [
+      "Camera and scanning",
+      "Camera permission is requested only after choosing to scan. Frames and uploaded scan images are decoded locally in your browser and are not sent to a third-party scanner. The decoded code is sent to Ovelo to resolve your authorized item."
+    ],
+    [
+      "Retention and deletion",
+      "Records remain while needed for your account and configured service operation. Archiving an item preserves its history. Document deletion removes the attached stored file through the provider; account deletion revokes sessions and removes or de-identifies associated records according to application deletion behavior. Security and administrator audit history may be retained for accountability; provider backups may persist until their retention expires. We do not promise immediate erasure from every backup."
+    ],
+    [
+      "Your choices and contact",
+      "You can update records, delete documents, revoke sessions, unlink by contacting support where a self-service option is unavailable, and request account export/deletion through account controls or support. Contact contact@lightsout.in for privacy questions or requests applicable to your circumstances. This policy describes actual functionality and does not claim legal certification."
+    ]
+  ]
+}

@@ -22,6 +22,8 @@ const contentTypes = {
   '.jpg': 'image/jpeg',
   '.js': 'text/javascript; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
+  '.txt': 'text/plain; charset=utf-8',
+  '.xml': 'application/xml; charset=utf-8',
   '.png': 'image/png',
   '.svg': 'image/svg+xml',
   '.webmanifest': 'application/manifest+json; charset=utf-8',
@@ -57,7 +59,11 @@ function sendFile(response, file) {
   response.setHeader('X-Content-Type-Options', 'nosniff');
   response.setHeader(
     'Cache-Control',
-    response.getHeader('Cache-Control') === 'no-store' ? 'no-store' : file.includes(`${join('dist', 'assets')}`) ? 'public, max-age=31536000, immutable' : 'no-cache',
+    response.getHeader('Cache-Control') === 'no-store'
+      ? 'no-store'
+      : file.includes(`${join('dist', 'assets')}`)
+        ? 'public, max-age=31536000, immutable'
+        : 'no-cache',
   );
   if (response.req.method === 'HEAD') return response.end();
   createReadStream(file)
@@ -67,33 +73,138 @@ function sendFile(response, file) {
 
 const server = createServer(async (request, response) => {
   let pathname;
-  try { pathname = decodeURIComponent(new URL(request.url || '/', 'https://ovelo.invalid').pathname); }
-  catch { response.statusCode = 400; return response.end('Invalid request.'); }
-  if ((/^\/admin(?:\/|$)/.test(pathname) && !['/admin/login', '/admin/forgot-password', '/admin/reset-password'].includes(pathname)) || /^\/assets\/AdminPage-/.test(pathname)) {
+  try {
+    pathname = decodeURIComponent(new URL(request.url || '/', 'https://ovelo.invalid').pathname);
+  } catch {
+    response.statusCode = 400;
+    return response.end('Invalid request.');
+  }
+  const publicPages = new Set(['/', '/how-it-works', '/terms', '/privacy']);
+  const publicRedirects = new Map([
+    ['/how-it-works/', '/how-it-works'],
+    ['/terms/', '/terms'],
+    ['/privacy/', '/privacy'],
+  ]);
+  if (publicRedirects.has(pathname)) {
+    response.writeHead(308, { Location: publicRedirects.get(pathname) });
+    return response.end();
+  }
+  if (
+    (/^\/admin(?:\/|$)/.test(pathname) &&
+      !['/admin/login', '/admin/forgot-password', '/admin/reset-password'].includes(pathname)) ||
+    /^\/assets\/AdminPage-/.test(pathname)
+  ) {
     response.setHeader('Cache-Control', 'no-store');
     try {
       const action = pathname === '/admin/entry' ? 'redeem' : 'validate';
-      const value = action === 'redeem' ? new URL(request.url, 'https://ovelo.invalid').searchParams.get('ticket') : (request.headers.cookie || '').split(';').map(c => c.trim()).find(c => c.startsWith('ovelo_admin_gate='))?.split('=')[1];
-      if (!value || !/^[a-f0-9]{64}$/.test(value)) { response.writeHead(302, { Location: '/admin/login' }); return response.end(); }
+      const value =
+        action === 'redeem'
+          ? new URL(request.url, 'https://ovelo.invalid').searchParams.get('ticket')
+          : (request.headers.cookie || '')
+              .split(';')
+              .map((c) => c.trim())
+              .find((c) => c.startsWith('ovelo_admin_gate='))
+              ?.split('=')[1];
+      if (!value || !/^[a-f0-9]{64}$/.test(value)) {
+        response.writeHead(302, { Location: '/admin/login' });
+        return response.end();
+      }
       const target = new URL(`/api/v1/admin/gate/${action}`, process.env.API_URL);
-      const signature = createHmac('sha256', process.env.SESSION_SECRET).update(`admin-gate:${action}:${value}`).digest('hex');
-      const verification = await fetch(target, { method: 'POST', headers: { 'content-type': 'application/json', 'x-ovelo-gate-signature': signature }, body: JSON.stringify({ value }), redirect: 'error', signal: AbortSignal.timeout(15000) });
-      if (verification.status === 401 || verification.status === 403) { response.writeHead(302, { Location: '/admin/login' }); return response.end(); }
-      if (!verification.ok) { response.statusCode = 503; return response.end('Administrator authentication is temporarily unavailable.'); }
+      const signature = createHmac('sha256', process.env.SESSION_SECRET)
+        .update(`admin-gate:${action}:${value}`)
+        .digest('hex');
+      const verification = await fetch(target, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-ovelo-gate-signature': signature },
+        body: JSON.stringify({ value }),
+        redirect: 'error',
+        signal: AbortSignal.timeout(15000),
+      });
+      if (verification.status === 401 || verification.status === 403) {
+        response.writeHead(302, { Location: '/admin/login' });
+        return response.end();
+      }
+      if (!verification.ok) {
+        response.statusCode = 503;
+        return response.end('Administrator authentication is temporarily unavailable.');
+      }
       const result = await verification.json();
       if (action === 'redeem') {
-        response.setHeader('Set-Cookie', `ovelo_admin_gate=${result.data.gate}; HttpOnly; Path=/; SameSite=Lax; Max-Age=7200${process.env.COOKIE_SECURE === 'true' ? '; Secure' : ''}`);
-        response.writeHead(302, { Location: '/admin', 'Referrer-Policy': 'no-referrer' }); return response.end();
+        response.setHeader(
+          'Set-Cookie',
+          `ovelo_admin_gate=${result.data.gate}; HttpOnly; Path=/; SameSite=Lax; Max-Age=7200${process.env.COOKIE_SECURE === 'true' ? '; Secure' : ''}`,
+        );
+        response.writeHead(302, { Location: '/admin', 'Referrer-Policy': 'no-referrer' });
+        return response.end();
       }
-      if (result?.data?.authenticated !== true) { response.writeHead(302, { Location: '/admin/login' }); return response.end(); }
-    } catch { response.statusCode = 503; return response.end('Administrator authentication is temporarily unavailable.'); }
+      if (result?.data?.authenticated !== true) {
+        response.writeHead(302, { Location: '/admin/login' });
+        return response.end();
+      }
+    } catch {
+      response.statusCode = 503;
+      return response.end('Administrator authentication is temporarily unavailable.');
+    }
   }
   response.setHeader('Permissions-Policy', 'camera=(self), microphone=(), geolocation=()');
+  const htmlRequest = request.method === 'GET' && (pathname === '/' || !extname(pathname));
+  if (htmlRequest)
+    response.setHeader(
+      'X-Robots-Tag',
+      publicPages.has(pathname) ? 'index, follow' : 'noindex, nofollow',
+    );
   const requested = safeFile(request.url || '/');
+  const knownAppRoute =
+    publicPages.has(pathname) ||
+    [
+      '/login',
+      '/register',
+      '/verify-email',
+      '/forgot-password',
+      '/reset-password',
+      '/dashboard',
+      '/inventory',
+      '/add-item',
+      '/activity',
+      '/locations',
+      '/documents',
+      '/containers',
+      '/warranties',
+      '/reports',
+      '/search',
+      '/notifications',
+      '/settings',
+      '/scan',
+      '/admin',
+      '/admin/login',
+      '/admin/forgot-password',
+      '/admin/reset-password',
+    ].includes(pathname) ||
+    /^\/(item|i)\//.test(pathname) ||
+    /^\/admin\//.test(pathname);
+  const publicPage =
+    publicPages.has(pathname) && pathname !== '/'
+      ? join(root, pathname.slice(1), 'index.html')
+      : null;
+  if (pathname !== '/' && !knownAppRoute && !extname(pathname)) {
+    response.statusCode = 404;
+    return response.end('Not found.');
+  }
+  if (
+    extname(pathname) &&
+    (!requested || !existsSync(requested) || !statSync(requested).isFile())
+  ) {
+    response.statusCode = 404;
+    return response.end('Not found.');
+  }
   const file =
-    requested && existsSync(requested) && statSync(requested).isFile()
-      ? requested
-      : join(root, 'index.html');
+    publicPage && existsSync(publicPage)
+      ? publicPage
+      : !publicPages.has(pathname) && knownAppRoute && existsSync(join(root, 'private.html'))
+        ? join(root, 'private.html')
+        : requested && existsSync(requested) && statSync(requested).isFile()
+          ? requested
+          : join(root, 'index.html');
   if (!existsSync(file)) {
     response.statusCode = 503;
     return response.end('Web build is not available.');
@@ -102,10 +213,18 @@ const server = createServer(async (request, response) => {
 });
 
 server.on('error', (error) => {
-  console.error(JSON.stringify({ service: 'web', code: error.code || 'LISTENER_FAILED', message: 'Web listener failed' }));
+  console.error(
+    JSON.stringify({
+      service: 'web',
+      code: error.code || 'LISTENER_FAILED',
+      message: 'Web listener failed',
+    }),
+  );
   process.exitCode = 1;
 });
-server.listen(port, host, () => console.info(`Ovelo v${release.version} — ${release.name}: Web running on ${host}:${port}`));
+server.listen(port, host, () =>
+  console.info(`Ovelo v${release.version} — ${release.name}: Web running on ${host}:${port}`),
+);
 let stopping = false;
 function shutdown(signal) {
   if (stopping) return;

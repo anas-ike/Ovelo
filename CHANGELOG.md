@@ -2,10 +2,36 @@
 
 Every meaningful production pass adds a release here and in [CHANGELOG.js](CHANGELOG.js). The root package version is the application version. See [release workflow](docs/releases.md) and [production verification](docs/production-verification.md). Previous history is retained.
 
+## v0.3.0 — SEO and Web Quality Optimization
+
+Date: 2026-10-05
+
+### Implemented
+
+- Crawlable static HTML for the four intentionally public pages, with unique titles/descriptions, HTTPS canonicals, robots directives, Open Graph/Twitter metadata, and truthful homepage JSON-LD.
+- Production-safe `sitemap.xml` and `robots.txt`; private/authenticated/API responses remain non-indexable and private routes remain authorization-protected.
+- Branded 1200×630 PNG social image generated from the existing Ovelo artwork.
+- Route-level lazy loading for private/authentication pages, public session-check avoidance, mobile public navigation, skip links, focus states, dialog/loading semantics, and improved muted-text contrast.
+- Correct public trailing-slash redirects, genuine 404 responses for unknown HTML paths/missing assets, and SEO documentation/backlink strategy.
+
+### Verification
+
+- Build, typecheck, lint, git diff check, and dependency audit: PASS. `npm test`: **24 passed, 29 integration tests skipped** in the default test environment; custom SEO assertions: 3 passed; prior dedicated security suite remains preserved and unchanged.
+- Static SEO source validation: PASS — four public pages, unique titles/descriptions, HTTPS canonicals, index/follow directives, one H1 each, valid homepage JSON-LD, Open Graph/Twitter metadata, and four canonical sitemap URLs.
+- Local Chromium responsive/accessibility smoke checks: PASS — 32 checks across 320, 360, 375, 390, 412, 768, 1024, and 1440px for all four public pages; no horizontal overflow and one H1 per page.
+- Production public checks: PASS — web/API v0.3.0, four public pages, sitemap, robots, private route noindex, 404 unknown paths, 1200×630 PNG social image, and nine unique public link targets.
+- Deployment/restart: PASS — existing web/API/worker, port bindings unchanged, no new shutdown failure, no configured secret in inspected logs.
+- Lighthouse: **BLOCKED — Lighthouse unavailable in the environment**. No Lighthouse scores or field Core Web Vitals claims are made.
+- Search Console: **MANUAL ACTION REQUIRED** — owner must verify `https://ovelo.lightsout.in/` and submit `https://ovelo.lightsout.in/sitemap.xml`.
+- Backlinks: no acquisitions claimed; strategy only.
+- Repository-wide `npm run format:check`: FAIL due to pre-existing formatting drift in 80 files outside this SEO pass; changed SEO files were formatted and `git diff --check` passes.
+
 ## v0.2.0 — Ownership Records and Administrator Security
+
 Date: 2026-10-05
 
 ### Added / Fixed
+
 - Functional item tabs; documents, warranty and repair records, attachments, item activity and location selection.
 - User-scoped global document/location pages and safe Google Maps link parsing.
 - Opaque QR/barcode generation, PNG/SVG download, local camera/image scanning and manual fallback.
@@ -14,6 +40,7 @@ Date: 2026-10-05
 - Public help, Terms and Privacy destinations.
 
 ### Verification
+
 - Build, typecheck and lint: PASS. Dedicated PostgreSQL/Redis tests: **50 passed (7 root + 43 API), none skipped**. Provider exchanges and SMTP are simulated in the authentication integration suite.
 - Isolated browser workflows: PASS — item creation with document/location, tabs, warranty/repair editing, activity, generated PNG/SVG labels, real QR/Code 128 image decoding and manual resolution, administrator gate/login, secondary creation, owner profile, user enable/disable, audit and logout revocation.
 - Camera opt-in, generated-frame decoding, stream cleanup and denied-camera fallback: PASS. Physical-device camera capture: NOT TESTED.
@@ -28,19 +55,23 @@ Date: 2026-10-05
 - Secret checks: PASS — intended staged files, configured-credential matching, signatures/history, deployed frontend and inspected startup logs; `.env` ignored and excluded.
 
 ## v0.1.2 — Production Deployment and Live Authentication Verification
+
 Date: 2026-10-05
 
 ### Deployment
+
 - Production verification uses the supplied ignored local `.env` and existing domains/allocations.
 - Deployed v0.1.2 to the existing Pterodactyl server; web/API/worker and production-domain health are operational.
 - Applied both existing reviewed migrations to the owner-confirmed Aiven database; required plans, entitlements and categories are present.
 
 ### Fixed
+
 - Reproduced slow external handshakes exceeding five-second defaults; Redis connection/readiness is bounded at 15 seconds and worker readiness at 30 seconds.
 - PostgreSQL defaults to a bounded 15-second connection timeout while preserving explicit operator settings, endpoint, credentials and TLS.
 - Production build subprocesses load the same ignored environment as startup.
 
 ### Verification
+
 - Build/typecheck/lint: PASS. Tests: 17 passed, 19 integration tests skipped; integration tests were not run against production and do not count as real OAuth verification.
 - Production PostgreSQL schema/TLS/queries, Redis TLS/SNI/auth/commands/BullMQ/reconnect, real provider initialization and Redis state protections: PASS.
 - Both production Login/Signup pages show Google, Discord and email/password on desktop/mobile; HTTPS API destinations and release metadata: PASS.
@@ -54,9 +85,11 @@ Date: 2026-10-05
 - Git secret check: PASS — staged files, actual configured credential matching, secret signatures, deployed frontend and startup logs. `.env` is ignored and excluded. Publication evidence is recorded in the matching report.
 
 ## v0.1.1 — Production Authentication Stabilization
+
 Date: 2026-10-05
 
 ### Fixed
+
 - Replaced production `concurrently → tree-kill → ps` shutdown with direct Node supervision and handled child errors, exits, closes and signals.
 - Centralized Redis URL parsing with decoded authentication, database selection, explicit hostname/SNI and verified TLS; corrected BullMQ endpoint configuration.
 - Shared a bounded readiness operation across concurrent callers and reconnects; added fail-closed startup/security diagnostics.
@@ -66,12 +99,14 @@ Date: 2026-10-05
 - Validated the production API build URL and published package-version/release metadata in HTML, API health and service logs.
 
 ### Security
+
 - Preserved CSRF, origin checks, cookie security, rate limiting, atomic expiring OAuth state, Google PKCE/nonce/signature validation and TLS certificate verification.
 - Live SNI differential: legacy connection failed; explicit SNI passed using the configured production URL, with no credentials logged.
 - Live PostgreSQL connection/TLS passed, but application schema checks failed (`P2021`, migration registry absent).
 - The container's configured `NODE_ENV`, `COOKIE_SECURE` and `TRUST_PROXY` do not match required production values; correction is required before deployment.
 
 ### Verification
+
 - Install, build, typecheck and lint: PASS (install-script policy warnings documented).
 - Unit/integration tests: PASS — 5 startup/release tests and 29 API tests, none skipped in the dedicated-service run. Provider responses and SMTP were simulated at test boundaries.
 - Isolated actual `npm start`, web/API listeners 6968/6971, worker, SIGTERM and SIGINT: PASS on Node 22 and Node 25. Redis-unavailable startup failed closed, exited nonzero and did not start the API listener.
@@ -83,6 +118,7 @@ Date: 2026-10-05
 - **Executive verdict: FAILED.** This release is not represented as deployed or production-authentication verified.
 
 ## v0.1.0 — Initial Ovelo Application and Pterodactyl Deployment
+
 Date: not recorded in the historical release registry.
 
 - Existing application baseline: ownership platform and Pterodactyl deployment through commit `1dc18a5`.

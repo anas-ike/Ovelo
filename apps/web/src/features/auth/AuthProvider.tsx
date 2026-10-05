@@ -1,4 +1,5 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import type { UserProfile } from '@ovelo/types';
 import { get, post } from '../../lib/api';
@@ -13,6 +14,9 @@ const Context = createContext<AuthContext | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const location = useLocation();
+  const checked = useRef(false);
+  const publicPage = ['/', '/how-it-works', '/terms', '/privacy'].includes(location.pathname);
   const refresh = async () => {
     try {
       const result = await get<{ data: { user: UserProfile } }>('/auth/me');
@@ -24,8 +28,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
   useEffect(() => {
+    if (publicPage || checked.current) return;
+    checked.current = true;
+    setLoading(true);
     void refresh();
-  }, []);
+  }, [publicPage]);
   const value = useMemo<AuthContext>(
     () => ({
       user,

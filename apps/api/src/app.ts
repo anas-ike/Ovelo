@@ -48,6 +48,7 @@ app.use(compression());
 app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
 app.use((req, res, next) => {
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow');
   res.setHeader('Permissions-Policy', 'camera=(self), microphone=(), geolocation=()');
   res.setHeader('Cache-Control', 'no-store');
   if (

@@ -1,0 +1,31 @@
+{
+  "site": {
+    "name": "Ovelo",
+    "title": "Ovelo — Know What You Own",
+    "description": "A private, organized way to keep track of the things you own, their details, documents, warranties, repairs, and locations.",
+    "url": "https://ovelo.lightsout.in",
+    "image": "https://ovelo.lightsout.in/og-image.png"
+  },
+  "pages": {
+    "/": {
+      "title": "Ovelo — Know What You Own",
+      "description": "A private, organized way to keep track of the things you own, their details, documents, warranties, repairs, and locations.",
+      "type": "website"
+    },
+    "/how-it-works": {
+      "title": "How Ovelo Works — Track Everything You Own",
+      "description": "Learn how Ovelo connects ownership details, documents, warranties, repairs, locations, and identification in one private record.",
+      "type": "article"
+    },
+    "/terms": {
+      "title": "Terms of Service — Ovelo",
+      "description": "Read the Ovelo Terms of Service for private ownership records, uploaded content, account use, availability, and support.",
+      "type": "article"
+    },
+    "/privacy": {
+      "title": "Privacy Policy — Ovelo",
+      "description": "Learn how Ovelo handles account information, ownership records, documents, sessions, security events, email, and privacy requests.",
+      "type": "article"
+    }
+  }
+}

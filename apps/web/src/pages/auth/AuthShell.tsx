@@ -15,11 +15,11 @@ export function AuthShell({
         <Logo />
         <div>
           <span className="eyebrow">WHAT DO I OWN?</span>
-          <h2>
+          <div className="visual-title" aria-hidden="true">
             A clearer
             <br />
             <em>record of life.</em>
-          </h2>
+          </div>
           <p>Keep the details that matter close, private, and easy to find.</p>
         </div>
         <span className="auth-visual-foot">Ovelo — Know what you own.</span>
@@ -33,7 +33,10 @@ export function AuthShell({
           <h1>{title}</h1>
           <p className="auth-subtitle">{subtitle}</p>
           {children}
-          <p className="auth-legal"><Link to="/terms">Terms of Service</Link> · <Link to="/privacy">Privacy Policy</Link> · <Link to="/how-it-works">How it works</Link></p>
+          <p className="auth-legal">
+            <Link to="/terms">Terms of Service</Link> · <Link to="/privacy">Privacy Policy</Link> ·{' '}
+            <Link to="/how-it-works">How it works</Link>
+          </p>
         </div>
       </div>
     </div>

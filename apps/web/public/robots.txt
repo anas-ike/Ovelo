@@ -1,0 +1,26 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /api/
+Disallow: /dashboard
+Disallow: /inventory
+Disallow: /item/
+Disallow: /add-item
+Disallow: /activity
+Disallow: /locations
+Disallow: /documents
+Disallow: /containers
+Disallow: /warranties
+Disallow: /reports
+Disallow: /search
+Disallow: /notifications
+Disallow: /settings
+Disallow: /scan
+Disallow: /i/
+Disallow: /login
+Disallow: /register
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /verify-email
+
+Sitemap: https://ovelo.lightsout.in/sitemap.xml
