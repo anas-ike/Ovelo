@@ -23,6 +23,7 @@ const nav = [
   { to: '/activity', label: 'Activity', icon: ClipboardList },
   { to: '/locations', label: 'Locations', icon: MapPin },
   { to: '/documents', label: 'Documents', icon: FileText },
+  { to: '/scan', label: 'Scan QR / Barcode', icon: Search },
 ];
 export function AppLayout() {
   const [open, setOpen] = useState(false);

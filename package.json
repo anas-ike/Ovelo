@@ -1,6 +1,6 @@
 {
   "name": "ovelo",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "private": true,
   "description": "Ovelo — Know what you own.",
   "workspaces": [
@@ -30,7 +30,8 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "resetpass": "node --import=dotenv/config scripts/resetpass.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",

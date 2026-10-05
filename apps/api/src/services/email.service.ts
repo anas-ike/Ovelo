@@ -24,11 +24,11 @@ export const sendVerificationEmail = (to: string, token: string) =>
     'Verify your Ovelo email',
     `<p>Welcome to Ovelo.</p><p><a href="${env.APP_URL}/verify-email?token=${encodeURIComponent(token)}">Verify your email</a></p><p>This link expires in 24 hours.</p>`,
   );
-export const sendPasswordResetEmail = (to: string, token: string) =>
+export const sendPasswordResetEmail = (to: string, token: string, admin = false) =>
   send(
     to,
     'Reset your Ovelo password',
-    `<p>We received a password reset request.</p><p><a href="${env.APP_URL}/reset-password?token=${encodeURIComponent(token)}">Choose a new password</a></p><p>This link expires in one hour.</p>`,
+    `<p>We received a password reset request.</p><p><a href="${env.APP_URL}/${admin ? 'admin/' : ''}reset-password?token=${encodeURIComponent(token)}">Choose a new password</a></p><p>This link expires in one hour.</p>`,
   );
 export const sendLoginNotification = (to: string) =>
   send(to, 'New sign-in to Ovelo', '<p>Your Ovelo account was just used to sign in.</p>');

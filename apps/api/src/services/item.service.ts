@@ -75,6 +75,7 @@ export async function createItem(userId: string, input: ItemInput) {
         modelNumber: input.modelNumber ?? null,
         manufacturer: input.manufacturer ?? null,
         notes: input.notes ?? null,
+        condition: input.condition ?? null,
         ...(input.barcode ? { barcodes: { create: { value: input.barcode } } } : {}),
       },
       select: { id: true },
@@ -123,10 +124,13 @@ export async function updateItem(userId: string, id: string, input: Partial<Item
       ...(input.modelNumber !== undefined && { modelNumber: input.modelNumber }),
       ...(input.manufacturer !== undefined && { manufacturer: input.manufacturer }),
       ...(input.notes !== undefined && { notes: input.notes }),
+      ...(input.condition !== undefined && { condition: input.condition }),
     },
     select: { id: true, name: true },
   });
   await recordActivity(userId, 'ITEM_UPDATED', `Updated ${updated.name}`, id);
+  if (input.locationId !== undefined && input.locationId !== existing.location?.id)
+    await recordActivity(userId, 'LOCATION_CHANGED', `Changed location for ${updated.name}`, id);
   return findItem(userId, id);
 }
 export async function deleteItem(userId: string, id: string) {

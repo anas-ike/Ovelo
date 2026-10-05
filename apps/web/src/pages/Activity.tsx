@@ -1,0 +1,7 @@
+import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
+import { useState } from 'react';
+import { get } from '../lib/api';
+import { Loading } from '../components/Loading';
+import { Button } from '../components/Button';
+export function Activity() { const [page, setPage] = useState(1); const q = useQuery({ queryKey: ['activity', page], queryFn: () => get<{ data: { data: { id: string; description: string; createdAt: string; item: { id: string; name: string } | null }[]; total: number } }>(`/activity?page=${page}&pageSize=30`) }); return <div><div className="form-page-head"><div><h2>Activity</h2><p>Your actual ownership history across items.</p></div></div>{q.isPending ? <Loading rows={5} /> : q.error ? <p role="alert" className="form-alert">Activity unavailable. <button onClick={() => void q.refetch()}>Retry</button></p> : <><ol className="record-timeline">{q.data.data.data.map(a => <li key={a.id}><strong>{a.description}</strong><small>{new Date(a.createdAt).toLocaleString()}</small>{a.item && <Link to={`/item/${a.item.id}?tab=activity`}>{a.item.name}</Link>}</li>)}</ol>{!q.data.data.data.length && <p>No activity yet.</p>}<div className="record-actions"><Button variant="ghost" disabled={page === 1} onClick={() => setPage(page - 1)}>Previous</Button><Button variant="ghost" disabled={page * 30 >= q.data.data.total} onClick={() => setPage(page + 1)}>Next</Button></div></>}</div>; }

@@ -17,19 +17,24 @@ export const itemSelect = {
   modelNumber: true,
   manufacturer: true,
   notes: true,
+  condition: true,
   saleDate: true,
   salePrice: true,
   buyerNote: true,
   createdAt: true,
   updatedAt: true,
   category: { select: { id: true, name: true, icon: true } },
-  location: { select: { id: true, name: true } },
+  location: { select: { id: true, name: true, address: true, mapsUrl: true, latitude: true, longitude: true } },
   container: { select: { id: true, name: true } },
   warranties: {
-    select: { id: true, startDate: true, endDate: true, provider: true, warrantyNumber: true },
+    select: { id: true, startDate: true, endDate: true, provider: true, warrantyNumber: true, planType: true, coverage: true, notes: true,
+      documents: { select: { documentId: true } } },
     orderBy: { endDate: 'asc' as const },
   },
   _count: { select: { documents: true, repairs: true } },
+  repairs: { select: { id: true, date: true, problem: true, repairShop: true, cost: true, currency: true, description: true, notes: true, documents: { select: { documentId: true } } }, orderBy: { date: 'desc' as const } },
+  qrCode: { select: { code: true, revokedAt: true, expiresAt: true } },
+  barcodes: { select: { id: true, value: true, format: true, revokedAt: true, expiresAt: true }, orderBy: { createdAt: 'desc' as const } },
 } satisfies Prisma.ItemSelect;
 export async function findItems(userId: string, filters: ItemSearch) {
   const where: Prisma.ItemWhereInput = {

@@ -1,4 +1,5 @@
 import { Logo } from '../../components/Logo';
+import { Link } from 'react-router-dom';
 export function AuthShell({
   children,
   title,
@@ -32,6 +33,7 @@ export function AuthShell({
           <h1>{title}</h1>
           <p className="auth-subtitle">{subtitle}</p>
           {children}
+          <p className="auth-legal"><Link to="/terms">Terms of Service</Link> · <Link to="/privacy">Privacy Policy</Link> · <Link to="/how-it-works">How it works</Link></p>
         </div>
       </div>
     </div>

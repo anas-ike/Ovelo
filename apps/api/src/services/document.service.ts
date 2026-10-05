@@ -51,7 +51,7 @@ export async function uploadDocument(
       });
       return created;
     });
-    return document;
+    return { ...document, storageObject: { ...document.storageObject, size: document.storageObject.size.toString() } };
   } catch (error) {
     await providerFor(stored.provider)
       .delete(stored.fileId, stored.storageKey)
@@ -61,7 +61,7 @@ export async function uploadDocument(
 }
 export async function downloadDocument(userId: string, documentId: string) {
   const document = await prisma.document.findFirst({
-    where: { id: documentId, item: { userId, deletedAt: null } },
+    where: { id: documentId, item: { userId, deletedAt: null }, storageObject: { userId, deletedAt: null } },
     select: {
       title: true,
       storageObject: {
@@ -83,7 +83,7 @@ export async function downloadDocument(userId: string, documentId: string) {
 }
 export async function deleteDocument(userId: string, documentId: string) {
   const document = await prisma.document.findFirst({
-    where: { id: documentId, item: { userId }, storageObject: { deletedAt: null } },
+    where: { id: documentId, item: { userId, deletedAt: null }, storageObject: { userId, deletedAt: null } },
     select: {
       id: true,
       itemId: true,

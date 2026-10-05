@@ -10,11 +10,13 @@ import {
   sellItemController,
   warrantyController,
   repairController,
+  updateWarrantyController, updateRepairController, removeWarrantyController, removeRepairController, itemActivityController,
 } from '../controllers/item.controller.js';
 import {
   barcodeController,
   qrController,
   revokeQrController,
+  generateQrController, generateBarcodeController,
 } from '../controllers/identifier.controller.js';
 export const itemRouter = Router();
 itemRouter.use(requireAuth);
@@ -27,6 +29,13 @@ itemRouter.delete('/:id', csrf, deleteItemController);
 itemRouter.post('/:id/sell', csrf, sellItemController);
 itemRouter.post('/:id/warranties', csrf, warrantyController);
 itemRouter.post('/:id/repairs', csrf, repairController);
+itemRouter.patch('/:id/warranties/:recordId', csrf, updateWarrantyController);
+itemRouter.delete('/:id/warranties/:recordId', csrf, removeWarrantyController);
+itemRouter.patch('/:id/repairs/:recordId', csrf, updateRepairController);
+itemRouter.delete('/:id/repairs/:recordId', csrf, removeRepairController);
+itemRouter.get('/:id/activity', itemActivityController);
 itemRouter.get('/:id/qr', qrController);
+itemRouter.post('/:id/qr', csrf, generateQrController);
 itemRouter.delete('/:id/qr', csrf, revokeQrController);
 itemRouter.get('/:id/barcode', barcodeController);
+itemRouter.post('/:id/barcode', csrf, generateBarcodeController);

@@ -1,14 +1,20 @@
 import { useEffect, useState } from 'react';
 import { ArrowLeft, FileUp, Plus, Save } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Button } from '../components/Button';
 import { Field, Input, Textarea } from '../components/Field';
-import { get, post } from '../lib/api';
+import { get, post, patch, upload } from '../lib/api';
+import { LocationPicker } from '../features/records/LocationPicker';
+import type { Place } from '../lib/records';
+import type { ItemDetailRecord } from './ItemDetail';
 type Option = { id: string; name: string; icon?: string };
 export function AddItem() {
   const navigate = useNavigate();
+  const { id } = useParams();
+  const [createdId, setCreatedId] = useState<string>();
+  const [files, setFiles] = useState<File[]>([]);
   const [categories, setCategories] = useState<Option[]>([]);
-  const [locations, setLocations] = useState<Option[]>([]);
+  const [locations, setLocations] = useState<Place[]>([]);
   const [form, setForm] = useState({
     name: '',
     manufacturer: '',
@@ -21,18 +27,21 @@ export function AddItem() {
     categoryId: '',
     locationId: '',
     notes: '',
+    condition: '',
+    estimatedValue: '',
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   useEffect(() => {
     void Promise.all([
       get<{ data: Option[] }>('/inventory/categories'),
-      get<{ data: Option[] }>('/inventory/locations'),
+      get<{ data: Place[] }>('/inventory/locations'),
     ]).then(([cats, locs]) => {
       setCategories(cats.data);
       setLocations(locs.data);
-    });
-  }, []);
+    }).catch(() => setError('Could not load item options. Refresh to try again.'));
+    if (id) void get<{ data: ItemDetailRecord }>(`/items/${id}`).then(({ data }) => setForm(s => ({ ...s, name: data.name, manufacturer: data.manufacturer || '', modelNumber: data.modelNumber || '', serialNumber: data.serialNumber || '', purchasePrice: data.purchasePrice || '', estimatedValue: data.estimatedValue || '', currency: data.currency, purchaseDate: data.purchaseDate?.slice(0, 10) || '', store: data.store || '', categoryId: data.category?.id || '', locationId: data.location?.id || '', notes: data.notes || '', condition: data.condition || '' }))).catch(() => setError('The item is unavailable.'));
+  }, [id]);
   const update = (key: keyof typeof form, value: string) =>
     setForm((current) => ({ ...current, [key]: value }));
   const submit = async (event: React.FormEvent) => {
@@ -40,14 +49,19 @@ export function AddItem() {
     setLoading(true);
     setError('');
     try {
-      const result = await post<{ data: { id: string } }>('/items', {
+      const payload = {
         ...form,
         purchasePrice: form.purchasePrice ? Number(form.purchasePrice) : null,
+        estimatedValue: form.estimatedValue ? Number(form.estimatedValue) : null,
         purchaseDate: form.purchaseDate ? new Date(form.purchaseDate).toISOString() : null,
         categoryId: form.categoryId || null,
         locationId: form.locationId || null,
-      });
-      navigate(`/item/${result.data.id}`);
+      };
+      const target = createdId || id;
+      const result = target ? await patch<{ data: { id: string } }>(`/items/${target}`, payload) : await post<{ data: { id: string } }>('/items', payload);
+      setCreatedId(result.data.id);
+      for (const file of files) { const data = new FormData(); data.append('file', file); data.append('title', file.name); data.append('kind', 'OTHER'); await upload(`/items/${result.data.id}/documents`, data); setFiles(s => s.filter(f => f !== file)); }
+      navigate(`/item/${result.data.id}${files.length ? '?tab=documents' : ''}`);
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Could not save this item.');
     } finally {
@@ -62,7 +76,7 @@ export function AddItem() {
       <div className="form-page-head">
         <div>
           <span className="eyebrow">NEW OWNERSHIP RECORD</span>
-          <h2>Add an item</h2>
+           <h2>{id ? 'Edit item' : 'Add an item'}</h2>
           <p>Start with the details you know. Everything can be refined later.</p>
         </div>
         <div className="form-page-icon">
@@ -130,21 +144,9 @@ export function AddItem() {
                   ))}
                 </select>
               </Field>
-              <Field label="Location">
-                <select
-                  className="input"
-                  value={form.locationId}
-                  onChange={(e) => update('locationId', e.target.value)}
-                >
-                  <option value="">Choose a location</option>
-                  {locations.map((location) => (
-                    <option key={location.id} value={location.id}>
-                      {location.name}
-                    </option>
-                  ))}
-                </select>
-              </Field>
+              <Field label="Condition"><Input value={form.condition} onChange={e => update('condition', e.target.value)} placeholder="e.g. Good, minor wear" /></Field>
             </div>
+            <LocationPicker locations={locations} value={form.locationId} onSelect={value => update('locationId', value)} onCreated={place => setLocations(s => [...s, place])} />
             <div className="form-grid-2">
               <Field label="Serial number">
                 <Input
@@ -212,6 +214,7 @@ export function AddItem() {
                 rows={4}
               />
             </Field>
+            <Field label="Current value (optional)"><Input type="number" min="0" step="0.001" value={form.estimatedValue} onChange={e => update('estimatedValue', e.target.value)} /></Field>
           </div>
         </section>
         <section className="attach-callout">
@@ -219,8 +222,11 @@ export function AddItem() {
             <FileUp size={20} />
           </div>
           <div>
-            <strong>Attach supporting records later</strong>
+            <strong>Attach supporting documents</strong>
             <p>Receipts, warranty documents, photos, and manuals live with this item.</p>
+            <Input type="file" multiple accept="image/jpeg,image/png,image/webp,application/pdf" disabled={loading} onChange={e => setFiles(s => [...s, ...Array.from(e.target.files || [])])} />
+            {files.map((f, i) => <p key={`${f.name}-${i}`}>{f.name} <button type="button" className="text-button" onClick={() => setFiles(s => s.filter((_, n) => n !== i))}>Remove</button></p>)}
+            {createdId && <p role="status">The item was saved. Retry any remaining attachments or <Link to={`/item/${createdId}?tab=documents`}>open its Documents tab</Link>.</p>}
           </div>
         </section>
         <div className="form-actions">

@@ -8,24 +8,37 @@ import { VerifyEmail } from './pages/auth/VerifyEmail';
 import { ForgotPassword } from './pages/auth/ForgotPassword';
 import { ResetPassword } from './pages/auth/ResetPassword';
 import { AdminLogin } from './pages/admin/AdminLogin';
-import { AdminPage } from './pages/admin/AdminPage';
+import { lazy, Suspense } from 'react';
+import { AdminProtectedRoute } from './layouts/AdminProtectedRoute';
+import { AdminRecovery } from './pages/admin/AdminRecovery';
 import { QrRedirect } from './pages/QrRedirect';
 import { Dashboard } from './pages/Dashboard';
 import { Inventory } from './pages/Inventory';
 import { AddItem } from './pages/AddItem';
 import { ItemDetail } from './pages/ItemDetail';
 import { GenericPage } from './pages/GenericPage';
+import { Documents } from './pages/Documents';
+import { Locations } from './pages/Locations';
+import { Scan } from './pages/Scan';
+import { PublicInfo } from './pages/PublicInfo';
+import { Activity } from './pages/Activity';
+const AdminPage = lazy(() => import('./pages/admin/AdminPage').then(m => ({ default: m.AdminPage })));
 export function App() {
   return (
     <Routes>
       <Route path="/" element={<Landing />} />
+      <Route path="/how-it-works" element={<PublicInfo kind="help" />} />
+      <Route path="/terms" element={<PublicInfo kind="terms" />} />
+      <Route path="/privacy" element={<PublicInfo kind="privacy" />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/verify-email" element={<VerifyEmail />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/admin/login" element={<AdminLogin />} />
-      <Route path="/admin" element={<AdminPage />} />
+      <Route path="/admin/forgot-password" element={<AdminRecovery />} />
+      <Route path="/admin/reset-password" element={<AdminRecovery reset />} />
+      <Route element={<AdminProtectedRoute />}><Route path="/admin/*" element={<Suspense fallback={<p>Loading administrator page…</p>}><AdminPage /></Suspense>} /></Route>
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
           <Route path="/i/:code" element={<QrRedirect />} />
@@ -33,24 +46,18 @@ export function App() {
           <Route path="/inventory" element={<Inventory />} />
           <Route path="/add-item" element={<AddItem />} />
           <Route path="/item/:id" element={<ItemDetail />} />
+          <Route path="/item/:id/edit" element={<AddItem />} />
+          <Route path="/scan" element={<Scan />} />
           <Route
             path="/activity"
             element={
-              <GenericPage
-                title="Activity"
-                description="A chronological record of the changes you make to your ownership records."
-                endpoint="/activity"
-              />
+              <Activity />
             }
           />
           <Route
             path="/locations"
             element={
-              <GenericPage
-                title="Locations"
-                description="Keep a clear map of where your things live."
-                endpoint="/inventory/locations"
-              />
+              <Locations />
             }
           />
           <Route
@@ -66,10 +73,7 @@ export function App() {
           <Route
             path="/documents"
             element={
-              <GenericPage
-                title="Documents"
-                description="Supporting records attached to your ownership records."
-              />
+              <Documents />
             }
           />
           <Route

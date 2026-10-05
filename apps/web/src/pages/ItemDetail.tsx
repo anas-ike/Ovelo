@@ -1,292 +1,56 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  ArrowLeft,
-  Download,
-  FileText,
-  MoreHorizontal,
-  Pencil,
-  Plus,
-  ShieldCheck,
-  Tag,
-  Wrench,
-} from 'lucide-react';
-import { Link, useParams } from 'react-router-dom';
-import { get, upload } from '../lib/api';
+import { ArrowLeft, Pencil, Plus } from 'lucide-react';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useState } from 'react';
+import { del, get } from '../lib/api';
+import type { DocumentRecord, Place, Repair, Warranty } from '../lib/records';
+import { displayDate, warrantyStatus } from '../lib/records';
 import { Loading } from '../components/Loading';
 import { Badge } from '../components/Badge';
 import { Button } from '../components/Button';
-import { useRef, useState } from 'react';
-type Detail = {
-  id: string;
-  inventoryCode: string;
-  name: string;
-  description: string | null;
-  status: string;
-  purchaseDate: string | null;
-  purchasePrice: string | null;
-  estimatedValue: string | null;
-  currency: string;
-  store: string | null;
-  serialNumber: string | null;
-  modelNumber: string | null;
-  manufacturer: string | null;
-  notes: string | null;
-  createdAt: string;
-  updatedAt: string;
-  category: { id: string; name: string; icon: string } | null;
-  location: { id: string; name: string } | null;
-  container: { id: string; name: string } | null;
-  warranties: {
-    id: string;
-    startDate: string;
-    endDate: string;
-    provider: string | null;
-    warrantyNumber: string | null;
-  }[];
+import { DocumentList } from '../features/records/DocumentList';
+import { RecordForm } from '../features/records/RecordForm';
+import { Identification } from '../features/records/Identification';
+export type ItemDetailRecord = {
+  id: string; inventoryCode: string; name: string; description: string | null; condition: string | null; status: string;
+  purchaseDate: string | null; purchasePrice: string | null; estimatedValue: string | null; currency: string; store: string | null;
+  serialNumber: string | null; modelNumber: string | null; manufacturer: string | null; notes: string | null; createdAt: string; updatedAt: string;
+  category: { id: string; name: string } | null; location: Place | null; warranties: Warranty[]; repairs: Repair[];
+  qrCode: { code: string; revokedAt: string | null; expiresAt: string | null } | null;
+  barcodes: { value: string; revokedAt: string | null; expiresAt: string | null }[];
   _count: { documents: number; repairs: number };
 };
-const date = (value: string | null) =>
-  value
-    ? new Intl.DateTimeFormat('en', { day: 'numeric', month: 'short', year: 'numeric' }).format(
-        new Date(value),
-      )
-    : '—';
+const tabs = ['overview', 'documents', 'warranty', 'repairs', 'activity'] as const;
 export function ItemDetail() {
-  const { id } = useParams();
-  const client = useQueryClient();
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState(false);
-  const query = useQuery({
-    queryKey: ['item', id],
-    queryFn: () => get<{ data: Detail }>(`/items/${id}`),
-    enabled: Boolean(id),
-  });
-  if (query.isLoading) return <Loading rows={8} />;
-  if (query.error || !query.data)
-    return <div className="page-error">This item could not be found.</div>;
-  const item = query.data.data;
-  const warranty = item.warranties[0];
-  const days = warranty
-    ? Math.ceil((new Date(warranty.endDate).getTime() - Date.now()) / 86400000)
-    : null;
-  const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file || !id) return;
-    const form = new FormData();
-    form.append('file', file);
-    form.append('kind', 'OTHER');
-    form.append('title', file.name);
-    setUploading(true);
-    try {
-      await upload(`/items/${id}/documents`, form);
-      await client.invalidateQueries({ queryKey: ['item', id] });
-    } catch {
-      /* surfaced through the next refresh */
-    } finally {
-      setUploading(false);
-      event.target.value = '';
-    }
-  };
-  return (
-    <div className="detail-page">
-      <Link className="back-link" to="/inventory">
-        <ArrowLeft size={15} /> Back to inventory
-      </Link>
-      <div className="detail-hero">
-        <div className="detail-art">
-          <span>{item.name.slice(0, 1).toUpperCase()}</span>
-        </div>
-        <div className="detail-title">
-          <div className="detail-title-row">
-            <Badge tone={item.status === 'OWNED' ? 'green' : 'neutral'}>
-              {item.status.toLowerCase()}
-            </Badge>
-            <span className="detail-id">{item.inventoryCode}</span>
-          </div>
-          <h2>{item.name}</h2>
-          <p>
-            {[item.manufacturer, item.modelNumber, item.category?.name]
-              .filter(Boolean)
-              .join(' · ') || 'Uncategorized item'}
-          </p>
-        </div>
-        <div className="detail-actions">
-          <Button variant="ghost">
-            <Pencil size={16} /> Edit
-          </Button>
-          <button className="icon-button">
-            <MoreHorizontal size={19} />
-          </button>
-        </div>
-      </div>
-      <div className="detail-grid">
-        <section className="detail-main">
-          <div className="detail-tabs">
-            <button className="active">Overview</button>
-            <button>
-              Documents <span>{item._count.documents}</span>
-            </button>
-            <button>Warranty {warranty && <span>1</span>}</button>
-            <button>
-              Repairs <span>{item._count.repairs}</span>
-            </button>
-            <button>Activity</button>
-          </div>
-          <div className="detail-sections">
-            <section className="detail-section">
-              <div className="section-head">
-                <div>
-                  <span className="eyebrow">THE BASICS</span>
-                  <h3>Ownership details</h3>
-                </div>
-                <Tag size={18} />
-              </div>
-              <div className="detail-facts">
-                <Fact
-                  label="Purchase"
-                  value={
-                    item.purchasePrice ? `${item.purchasePrice} ${item.currency}` : 'Not recorded'
-                  }
-                  sub={date(item.purchaseDate)}
-                />
-                <Fact
-                  label="Current value"
-                  value={
-                    item.estimatedValue
-                      ? `${item.estimatedValue} ${item.currency}`
-                      : 'Not estimated'
-                  }
-                  sub="User-entered estimate"
-                />
-                <Fact
-                  label="Location"
-                  value={item.location?.name || 'No location'}
-                  sub={item.container?.name || undefined}
-                />
-                <Fact label="Serial number" value={item.serialNumber || 'Not recorded'} />
-              </div>
-            </section>
-            <section className="detail-section">
-              <div className="section-head">
-                <div>
-                  <span className="eyebrow">SUPPORTING RECORDS</span>
-                  <h3>Documents</h3>
-                </div>
-                <button
-                  className="section-action"
-                  onClick={() => fileRef.current?.click()}
-                  disabled={uploading}
-                >
-                  {uploading ? (
-                    'Uploading…'
-                  ) : (
-                    <>
-                      <Plus size={15} /> Add
-                    </>
-                  )}
-                </button>
-                <input
-                  ref={fileRef}
-                  type="file"
-                  hidden
-                  accept="image/jpeg,image/png,image/webp,application/pdf"
-                  onChange={handleUpload}
-                />
-              </div>
-              {item._count.documents ? (
-                <div className="record-placeholder">
-                  <FileText size={18} />
-                  <span>
-                    {item._count.documents} attached record{item._count.documents === 1 ? '' : 's'}
-                  </span>
-                  <Download size={15} />
-                </div>
-              ) : (
-                <div className="inline-empty">
-                  <FileText size={18} />
-                  <span>No documents yet. Add a receipt, warranty, or manual.</span>
-                </div>
-              )}
-            </section>
-            <section className="detail-section">
-              <div className="section-head">
-                <div>
-                  <span className="eyebrow">COVERAGE</span>
-                  <h3>Warranty</h3>
-                </div>
-                <ShieldCheck size={18} />
-              </div>
-              {warranty ? (
-                <div className="warranty-detail">
-                  <div className="warranty-detail-icon">
-                    <ShieldCheck size={20} />
-                  </div>
-                  <div>
-                    <strong>{warranty.provider || 'Warranty coverage'}</strong>
-                    <span>
-                      {date(warranty.startDate)} — {date(warranty.endDate)}
-                    </span>
-                  </div>
-                  <Badge tone={days !== null && days <= 90 ? 'amber' : 'green'}>
-                    {days && days > 0 ? `${days} days left` : 'Expired'}
-                  </Badge>
-                </div>
-              ) : (
-                <div className="inline-empty">
-                  <ShieldCheck size={18} />
-                  <span>No warranty details attached yet.</span>
-                  <button className="text-button">Add warranty</button>
-                </div>
-              )}
-            </section>
-            <section className="detail-section">
-              <div className="section-head">
-                <div>
-                  <span className="eyebrow">MAINTENANCE</span>
-                  <h3>Repairs</h3>
-                </div>
-                <Wrench size={18} />
-              </div>
-              <div className="inline-empty">
-                <Wrench size={18} />
-                <span>
-                  {item._count.repairs
-                    ? `${item._count.repairs} repair records`
-                    : 'No repairs recorded.'}
-                </span>
-                <button className="text-button">Add repair</button>
-              </div>
-            </section>
-          </div>
-        </section>
-        <aside className="detail-aside">
-          <div className="aside-card ownership-card">
-            <span className="eyebrow">OWNED SINCE</span>
-            <strong>{date(item.createdAt)}</strong>
-            <p>Ovelo has kept this record for you.</p>
-            <div className="aside-rule" />
-            <span className="eyebrow">INVENTORY ID</span>
-            <code>{item.inventoryCode}</code>
-          </div>
-          <div className="aside-card">
-            <span className="eyebrow">LAST UPDATED</span>
-            <strong>{date(item.updatedAt)}</strong>
-            <p>Changes are kept in your activity history.</p>
-            <Link className="subtle-link" to="/activity">
-              View history <ArrowLeft size={14} />
-            </Link>
-          </div>
-        </aside>
-      </div>
-    </div>
-  );
+  const { id } = useParams(); const client = useQueryClient(); const navigate = useNavigate(); const [params, setParams] = useSearchParams();
+  const selected = params.get('tab') || 'overview'; const tab = tabs.includes(selected as typeof tabs[number]) ? selected : 'overview';
+  const [editing, setEditing] = useState<{ kind: 'warranty' | 'repair'; record?: Warranty | Repair }>();
+  const [error, setError] = useState(''), [busy, setBusy] = useState(false), [message, setMessage] = useState('');
+  const query = useQuery({ queryKey: ['item', id], queryFn: () => get<{ data: ItemDetailRecord }>(`/items/${id}`), enabled: !!id });
+  const docs = useQuery({ queryKey: ['documents', id], queryFn: () => get<{ data: DocumentRecord[] }>(`/items/${id}/documents`), enabled: !!id });
+  const activity = useQuery({ queryKey: ['item-activity', id], queryFn: () => get<{ data: { id: string; action: string; description: string; createdAt: string }[] }>(`/items/${id}/activity`), enabled: !!id });
+  async function refresh() { await Promise.all([client.invalidateQueries({ queryKey: ['item', id] }), client.invalidateQueries({ queryKey: ['documents'] }), client.invalidateQueries({ queryKey: ['item-activity', id] }), client.invalidateQueries({ queryKey: ['locations'] })]); }
+  async function remove(path: string, label: string) { if (!window.confirm(`Delete this ${label}?`)) return; setBusy(true); setError(''); try { await del(path); await refresh(); setMessage(`${label} deleted.`); } catch (e) { setError(e instanceof Error ? e.message : 'Could not delete record.'); } finally { setBusy(false); } }
+  if (query.isPending) return <Loading rows={8} />;
+  if (query.error || !query.data) return <div className="page-error">This item could not be found. <Link to="/inventory">Return to inventory</Link></div>;
+  const item = query.data.data, documents = docs.data?.data || [];
+  return <div className="detail-page"><Link className="back-link" to="/inventory"><ArrowLeft size={15} />Back to inventory</Link>
+    <div className="detail-hero"><div className="detail-art"><span>{item.name[0]?.toUpperCase()}</span></div><div className="detail-title"><div className="detail-title-row"><Badge tone={item.status === 'OWNED' ? 'green' : 'neutral'}>{item.status.toLowerCase()}</Badge><span className="detail-id">{item.inventoryCode}</span></div><h2>{item.name}</h2><p>{[item.manufacturer, item.modelNumber, item.category?.name].filter(Boolean).join(' · ') || 'Uncategorized item'}</p></div><div className="detail-actions"><Link className="button button-ghost" to={`/item/${id}/edit`}><Pencil size={16} />Edit</Link><Button variant="ghost" disabled={busy} onClick={() => { if (window.confirm('Archive this item? Its ownership history will be retained.')) { setBusy(true); void del(`/items/${id}`).then(() => navigate('/inventory')).catch(e => { setError(e.message); setBusy(false); }); } }}>Archive</Button></div></div>
+    {error && <p className="form-alert" role="alert">{error}</p>}{message && <p className="success-note" role="status">{message}</p>}
+    <div className="detail-grid"><section className="detail-main"><div className="detail-tabs" role="tablist" aria-label="Item records">{tabs.map(t => <button key={t} id={`tab-${t}`} role="tab" aria-selected={tab === t} aria-controls={`panel-${t}`} className={tab === t ? 'active' : ''} onClick={() => setParams({ tab: t })} onKeyDown={e => { if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) { e.preventDefault(); const next = e.key === 'Home' ? 0 : e.key === 'End' ? tabs.length - 1 : (tabs.indexOf(t) + (e.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length; setParams({ tab: tabs[next]! }); document.getElementById(`tab-${tabs[next]}`)?.focus(); } }}>{t[0]!.toUpperCase() + t.slice(1)}{t === 'documents' && <span>{item._count.documents}</span>}{t === 'repairs' && <span>{item.repairs.length}</span>}</button>)}</div>
+    <div className="detail-sections" id={`panel-${tab}`} role="tabpanel" aria-labelledby={`tab-${tab}`}>
+    {tab === 'overview' && <><section className="detail-section"><div className="section-head"><div><span className="eyebrow">THE BASICS</span><h3>Ownership details</h3></div></div><div className="detail-facts">{[['Name', item.name], ['Category', item.category?.name], ['Brand', item.manufacturer], ['Model', item.modelNumber], ['Serial number', item.serialNumber], ['Condition', item.condition], ['Purchase date', displayDate(item.purchaseDate)], ['Purchased from', item.store], ['Purchase price', item.purchasePrice ? `${item.purchasePrice} ${item.currency}` : null], ['Current value', item.estimatedValue ? `${item.estimatedValue} ${item.currency}` : null]].map(([label, value]) => <div className="fact" key={label}><span>{label}</span><strong>{value || 'Not recorded'}</strong></div>)}</div>{item.description && <p>{item.description}</p>}{item.notes && <p className="record-notes">{item.notes}</p>}</section>
+      <section className="detail-section"><h3>Location</h3>{item.location ? <><strong>{item.location.name}</strong>{item.location.address && <p>{item.location.address}</p>}{item.location.mapsUrl && <a className="text-link" href={item.location.mapsUrl} target="_blank" rel="noopener noreferrer">Open in Google Maps ↗</a>}</> : <p>No location recorded. <Link to={`/item/${id}/edit`}>Add location</Link></p>}</section>
+      <section className="detail-section"><h3>Supporting records</h3><div className="summary-links"><button onClick={() => setParams({ tab: 'documents' })}>{item._count.documents} documents</button><button onClick={() => setParams({ tab: 'warranty' })}>{item.warranties.length} warranties{item.warranties[0] && ` · ${warrantyStatus(item.warranties[0])}`}</button><button onClick={() => setParams({ tab: 'repairs' })}>{item.repairs.length} repairs</button></div></section>
+      <Identification itemId={item.id} qr={item.qrCode} barcodes={item.barcodes} onChange={refresh} />
+      <section className="detail-section"><div className="section-head"><h3>Recent activity</h3><button className="text-button" onClick={() => setParams({ tab: 'activity' })}>View all</button></div><Activity rows={activity.data?.data.slice(0, 5) || []} error={!!activity.error} /></section></>}
+    {tab === 'documents' && <section className="detail-section"><h3>Documents</h3>{docs.isPending ? <Loading rows={3} /> : docs.error ? <p role="alert" className="form-alert">Unable to load documents. <button onClick={() => void docs.refetch()}>Retry</button></p> : <DocumentList documents={documents} itemId={item.id} onChange={refresh} />}</section>}
+    {tab === 'warranty' && <section className="detail-section"><div className="section-head"><h3>Warranty</h3><Button onClick={() => setEditing({ kind: 'warranty' })}><Plus size={15} />Add warranty</Button></div>{!item.warranties.length && <p className="inline-empty">No warranty details attached yet.</p>}{item.warranties.map(w => <article className="record-card" key={w.id}><div><h3>{w.provider || 'Warranty coverage'}</h3><Badge tone={warrantyStatus(w) === 'Active' ? 'green' : 'amber'}>{warrantyStatus(w)}</Badge><p>{displayDate(w.startDate)} — {displayDate(w.endDate)}</p><p>{[w.planType, w.warrantyNumber].filter(Boolean).join(' · ')}</p><p className="record-notes">{w.coverage}</p><p className="record-notes">{w.notes}</p><Attachments ids={w.documents.map(d => d.documentId)} documents={documents} /></div><div className="record-actions"><Button variant="ghost" onClick={() => setEditing({ kind: 'warranty', record: w })}>Edit</Button><Button variant="ghost" disabled={busy} onClick={() => void remove(`/items/${id}/warranties/${w.id}`, 'warranty')}>Delete</Button></div></article>)}</section>}
+    {tab === 'repairs' && <section className="detail-section"><div className="section-head"><h3>Repairs</h3><Button onClick={() => setEditing({ kind: 'repair' })}><Plus size={15} />Add repair</Button></div>{!item.repairs.length && <p className="inline-empty">No repairs recorded.</p>}{item.repairs.map(r => <article className="record-card" key={r.id}><div><h3>{r.problem}</h3><p>{displayDate(r.date)} · {r.repairShop || 'Provider not recorded'} · {r.cost} {r.currency}</p><p className="record-notes">{r.description}</p><p className="record-notes">{r.notes}</p><Attachments ids={r.documents.map(d => d.documentId)} documents={documents} /></div><div className="record-actions"><Button variant="ghost" onClick={() => setEditing({ kind: 'repair', record: r })}>Edit</Button><Button variant="ghost" disabled={busy} onClick={() => void remove(`/items/${id}/repairs/${r.id}`, 'repair')}>Delete</Button></div></article>)}</section>}
+    {tab === 'activity' && <section className="detail-section"><h3>Item activity</h3>{activity.isPending ? <Loading rows={3} /> : <Activity rows={activity.data?.data || []} error={!!activity.error} />}</section>}
+    </div></section><aside className="detail-aside"><div className="aside-card ownership-card"><span className="eyebrow">OWNED SINCE</span><strong>{displayDate(item.createdAt)}</strong><p>Changes are retained in your ownership history.</p><div className="aside-rule" /><span className="eyebrow">INVENTORY ID</span><code>{item.inventoryCode}</code></div><div className="aside-card"><span className="eyebrow">LAST UPDATED</span><strong>{displayDate(item.updatedAt)}</strong></div></aside></div>
+    {editing && <RecordForm kind={editing.kind} record={editing.record} itemId={item.id} currency={item.currency} documents={documents} onClose={() => setEditing(undefined)} onSaved={async () => { await refresh(); setMessage(`${editing.kind} saved.`); }} />}
+  </div>;
 }
-function Fact({ label, value, sub }: { label: string; value: string; sub?: string }) {
-  return (
-    <div className="fact">
-      <span>{label}</span>
-      <strong>{value}</strong>
-      {sub && <small>{sub}</small>}
-    </div>
-  );
-}
+function Activity({ rows, error }: { rows: { id: string; action: string; description: string; createdAt: string }[]; error: boolean }) { return error ? <p role="alert">Activity could not be loaded.</p> : rows.length ? <ol className="record-timeline">{rows.map(a => <li key={a.id}><strong>{a.description}</strong><small>{displayDate(a.createdAt)} · {a.action.toLowerCase().replace(/_/g, ' ')}</small></li>)}</ol> : <p>No item activity recorded.</p>; }
+function Attachments({ ids, documents }: { ids: string[]; documents: DocumentRecord[] }) { return <ul>{documents.filter(d => ids.includes(d.id)).map(d => <li key={d.id}><Link to={`?tab=documents`}>{d.title}</Link></li>)}</ul>; }

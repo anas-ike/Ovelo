@@ -6,6 +6,7 @@ import { randomUUID } from 'node:crypto';
 import { prisma } from '../src/database/prisma.js';
 import { sendVerificationEmail } from '../src/services/email.service.js';
 import { hashToken } from '../src/utils/crypto.js';
+import argon2 from 'argon2';
 
 // Provider/SMTP boundaries are simulated; sessions, Redis, signatures and DB are real.
 vi.mock('../src/services/email.service.js', () => ({ sendVerificationEmail: vi.fn(), sendPasswordResetEmail: vi.fn(), sendLoginNotification: vi.fn() }));
@@ -16,10 +17,12 @@ describe.skipIf(process.env.RUN_DB_TESTS !== 'true')('production authentication 
   const email = `auth-${run}@gmail.com`;
   const googleEmail = `google-${run}@gmail.com`;
   const discordEmail = `discord-${run}@gmail.com`;
+  const adminEmail = `oauth-admin-${run}@gmail.com`;
   const password = `test-only-${run}`;
   let discordId = Date.now().toString();
   const appOrigin = 'https://ovelo.lightsout.in';
   let googleNonce = '';
+  let googleSubject = `google-${run}`;
   let badGoogleNonce = false;
   let invalidCode = false;
   let providerTimeout = false;
@@ -47,7 +50,7 @@ describe.skipIf(process.env.RUN_DB_TESTS !== 'true')('production authentication 
       if (value === 'https://www.googleapis.com/oauth2/v3/certs') return Response.json({ keys:[jwk] });
       if (value === 'https://oauth2.googleapis.com/token') {
         expect(String(init?.body)).toContain('code_verifier=');
-        const jwt = await new SignJWT({ nonce: badGoogleNonce ? 'wrong' : googleNonce, email:googleEmail, email_verified:true, name:'Test owner' }).setProtectedHeader({ alg:'RS256',kid:'test-key' }).setSubject(`google-${run}`).setAudience('test-google-client').setIssuer('https://accounts.google.com').setIssuedAt().setExpirationTime('5m').sign(privateKey);
+        const jwt = await new SignJWT({ nonce: badGoogleNonce ? 'wrong' : googleNonce, email:googleEmail, email_verified:true, name:'Test owner' }).setProtectedHeader({ alg:'RS256',kid:'test-key' }).setSubject(googleSubject).setAudience('test-google-client').setIssuer('https://accounts.google.com').setIssuedAt().setExpirationTime('5m').sign(privateKey);
         return Response.json({ id_token:jwt });
       }
       if (value === 'https://discord.com/api/oauth2/token') {
@@ -59,16 +62,17 @@ describe.skipIf(process.env.RUN_DB_TESTS !== 'true')('production authentication 
     }));
     app = (await import('../src/app.js')).app;
     await (await import('../src/config/redis.js')).verifySecurityRedis();
+    await prisma.user.create({ data: { email: adminEmail, name: 'OAuth administrator', role: 'ADMIN', emailVerifiedAt: new Date(), passwordHash: await argon2.hash(password) } });
   });
   afterAll(async () => {
-    await prisma.user.deleteMany({ where:{ email:{in:[email,googleEmail,discordEmail]} } });
+    await prisma.user.deleteMany({ where:{ email:{in:[email,googleEmail,discordEmail,adminEmail]} } });
     await (await import('../src/services/migration.service.js')).storageQueue.close();
     await (await import('../src/config/redis.js')).closeSecurityRedis();
     await prisma.$disconnect(); vi.unstubAllEnvs(); vi.unstubAllGlobals();
   });
 
-  async function start(agent: ReturnType<typeof request.agent>, provider: string) {
-    const response = await agent.get(`/api/v1/auth/${provider}`);
+  async function start(agent: ReturnType<typeof request.agent>, provider: string, admin = false) {
+    const response = await agent.get(admin ? `/api/v1/admin/oauth/${provider}` : `/api/v1/auth/${provider}`);
     expect(response.status).toBe(302);
     const url = new URL(response.headers.location!);
     expect(url.searchParams.get('redirect_uri')).toBe(`https://apiovelo.lightsout.in/api/v1/auth/${provider}/callback`);
@@ -203,6 +207,35 @@ describe.skipIf(process.env.RUN_DB_TESTS !== 'true')('production authentication 
       expect((await agent.get('/api/v1/auth/me')).status).toBe(401);
       const deniedState = await start(agent, provider);
       expect((await agent.get(`/api/v1/auth/${provider}/callback`).query({ state: deniedState, error: 'access_denied' })).headers.location).toContain('OAUTH_STATE_INVALID');
+    });
+  }
+  for (const [index, provider] of ['google', 'discord'].entries()) {
+    it(`${provider} administrator linking uses the admin session when a different normal session is present`, async () => {
+      googleSubject = `admin-google-${run}`; discordId = (Number(discordId) + 10).toString();
+      const fresh = request.agent(app).set('X-Forwarded-For', `198.51.100.${160 + index}`);
+      const unlinkedState = await start(fresh, provider, true);
+      expect((await fresh.get(`/api/v1/auth/${provider}/callback`).query({ state: unlinkedState, code: 'test-code' })).headers.location).toContain('ADMIN_INVITATION_REQUIRED');
+      expect((await fresh.get('/api/v1/admin/me')).status).toBe(401);
+      const agent = request.agent(app).set('X-Forwarded-For', `198.51.100.${150 + index}`);
+      expect((await agent.post('/api/v1/auth/login').send({ email, password })).status).toBe(200);
+      expect((await agent.post('/api/v1/admin/login').send({ email: adminEmail, password })).status).toBe(200);
+      const csrf = (await agent.get('/api/v1/admin/csrf')).body.data.csrfToken;
+      const linked = await agent.post(`/api/v1/admin/providers/${provider}/link`).set('X-CSRF-Token', csrf);
+      expect(linked.status).toBe(200); const authorization = new URL(linked.body.data.url);
+      if (provider === 'google') googleNonce = authorization.searchParams.get('nonce')!;
+      const callback = await agent.get(`/api/v1/auth/${provider}/callback`).query({ state: authorization.searchParams.get('state'), code: 'test-code' });
+      expect(callback.headers.location).toMatch(/^https:\/\/ovelo\.lightsout\.in\/admin\/entry\?ticket=[a-f0-9]{64}$/);
+      expect((await agent.get('/api/v1/admin/me')).body.data.email).toBe(adminEmail);
+      expect((await agent.get('/api/v1/auth/me')).body.data.user.email).toBe(email);
+      const loginState = await start(fresh, provider, true);
+      expect((await fresh.get(`/api/v1/auth/${provider}/callback`).query({ state: loginState, code: 'test-code' })).headers.location).toContain('/admin/entry?ticket=');
+      expect((await fresh.get('/api/v1/admin/me')).body.data.role).toBe('ADMIN');
+      expect((await fresh.get('/api/v1/auth/me')).status).toBe(401);
+      await prisma.user.update({ where: { email: adminEmail }, data: { disabledAt: new Date() } });
+      const disabledState = await start(fresh, provider, true);
+      expect((await fresh.get(`/api/v1/auth/${provider}/callback`).query({ state: disabledState, code: 'test-code' })).headers.location).toContain('ACCOUNT_UNAVAILABLE');
+      expect((await fresh.get('/api/v1/admin/me')).status).toBe(401);
+      await prisma.user.update({ where: { email: adminEmail }, data: { disabledAt: null } });
     });
   }
 });

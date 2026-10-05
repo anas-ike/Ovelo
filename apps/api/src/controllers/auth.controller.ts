@@ -66,7 +66,7 @@ export const verifyController = asyncHandler(async (req, res) => {
 });
 export const forgotController = asyncHandler(async (req, res) => {
   const { email } = loginSchema.pick({ email: true }).parse(req.body);
-  await requestPasswordReset(email);
+  try { await requestPasswordReset(email); } catch { /* Accepted response never enumerates accounts or SMTP availability. */ }
   res.json({ data: { accepted: true } });
 });
 export const resetController = asyncHandler(async (req, res) => {
@@ -104,6 +104,7 @@ export const logoutAllController = asyncHandler(async (req, res) => {
   res.status(204).send();
 });
 export const changeEmailController = asyncHandler(async (req, res) => {
+  if (req.auth!.role !== 'USER') throw new AppError(403, 'ADMIN_IDENTITY_PROTECTED', 'Administrator identity changes require owner-controlled administration.');
   const body = emailChangeSchema.parse(req.body);
   await requestEmailChange(req.auth!.userId, body.email);
   res.json({ data: { accepted: true } });
@@ -161,6 +162,7 @@ export const exportController = asyncHandler(async (req, res) => {
   res.json(user);
 });
 export const deleteAccountController = asyncHandler(async (req, res) => {
+  if (req.auth!.role !== 'USER') throw new AppError(403, 'ADMIN_IDENTITY_PROTECTED', 'Remove administrator privileges through the owner before deleting an account.');
   await prisma.$transaction([
     prisma.user.update({
       where: { id: req.auth!.userId },

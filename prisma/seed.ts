@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
-import argon2 from 'argon2';
+import { provisionMainAdmin } from '../apps/api/src/auth/main-admin.service.js';
 
 const prisma = new PrismaClient();
 async function main() {
@@ -26,7 +26,8 @@ async function main() {
     for (const feature of [
       'inventory',
       'documents',
-      ...(plan.code === 'PREMIUM' ? ['reports', 'qr', 'containers', 'advanced-history'] : []),
+      'qr',
+      ...(plan.code === 'PREMIUM' ? ['reports', 'containers', 'advanced-history'] : []),
     ]) {
       await prisma.entitlement.upsert({
         where: { planId_feature: { planId: saved.id, feature } },
@@ -48,27 +49,7 @@ async function main() {
       await prisma.category.create({ data: { name: name!, icon } });
   }
   if (process.env.ADMIN_PASSWORD) {
-    if (process.env.ADMIN_PASSWORD.length < 16)
-      throw new Error('ADMIN_PASSWORD must have at least 16 characters');
-    const email = process.env.ADMIN_EMAIL?.toLowerCase();
-    if (!email) throw new Error('ADMIN_EMAIL required');
-    const exists = await prisma.user.findUnique({ where: { email } });
-    if (exists && exists.role !== 'ADMIN')
-      throw new Error('Refusing to elevate an existing normal account');
-    if (!exists)
-      await prisma.user.create({
-        data: {
-          email,
-          name: 'Ovelo administrator',
-          role: 'ADMIN',
-          emailVerifiedAt: new Date(),
-          passwordHash: await argon2.hash(process.env.ADMIN_PASSWORD, {
-            type: argon2.argon2id,
-            memoryCost: 65536,
-            timeCost: 3,
-          }),
-        },
-      });
+    await provisionMainAdmin();
   }
   console.info('Ovelo plans and system categories seeded. No sample inventory created.');
 }

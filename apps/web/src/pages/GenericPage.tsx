@@ -3,6 +3,7 @@ import { ArrowUpRight, FolderOpen } from 'lucide-react';
 import { get } from '../lib/api';
 import { EmptyState } from '../components/EmptyState';
 import { Loading } from '../components/Loading';
+import { Link } from 'react-router-dom';
 export function GenericPage({
   title,
   description,
@@ -38,9 +39,9 @@ export function GenericPage({
           title={`Your ${title.toLowerCase()} will live here`}
           description="Add records from the ownership pages and they will appear here, connected to the things they belong to."
           action={
-            <button className="text-button">
+             <Link className="text-button" to="/how-it-works">
               Learn how it works <ArrowUpRight size={15} />
-            </button>
+             </Link>
           }
         />
       )}

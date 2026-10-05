@@ -10,6 +10,7 @@ import { ensureRedis, consumeOnce } from '../config/redis.js';
 import { savePendingIdentity } from './oauth-pending.service.js';
 import { z } from 'zod';
 import type { Response } from 'express';
+import { adminEntryUrl } from './admin-gate.service.js';
 
 type Provider = 'google' | 'discord';
 export function oauthCapabilities() {
@@ -104,7 +105,7 @@ const providers: Record<Provider, AuthenticationProvider> = {
   google: new GoogleAuthenticationProvider(),
   discord: new DiscordAuthenticationProvider(),
 };
-export async function oauthRedirect(provider: Provider, response: Response, linkUserId?: string) {
+export async function oauthRedirect(provider: Provider, response: Response, linkUserId?: string, adminLogin = false) {
   const state = randomToken();
   const verifier = randomToken();
   const nonce = randomToken();
@@ -113,7 +114,7 @@ export async function oauthRedirect(provider: Provider, response: Response, link
     await ensureRedis()
   ).set(
     `ovelo:oauth:${hashToken(state)}`,
-    JSON.stringify({ provider, verifier, nonce, linkUserId }),
+    JSON.stringify({ provider, verifier, nonce, linkUserId, adminLogin }),
     'EX',
     600,
   );
@@ -134,6 +135,7 @@ export async function completeOAuth(
   response: Response,
   userAgent?: string,
   currentUserId?: string,
+  currentAdminId?: string,
 ) {
   if (
     !state ||
@@ -153,16 +155,20 @@ export async function completeOAuth(
     verifier: string;
     nonce: string;
     linkUserId?: string;
+    adminLogin?: boolean;
   };
   if (flow.provider !== provider)
     throw new AppError(401, 'OAUTH_STATE_INVALID', 'Provider mismatch.');
-  if (flow.linkUserId && flow.linkUserId !== currentUserId) throw new AppError(401, 'OAUTH_STATE_INVALID', 'Sign in again before linking an account.');
+  const initiatingUserId = flow.adminLogin ? currentAdminId : currentUserId;
+  if (flow.linkUserId && flow.linkUserId !== initiatingUserId) throw new AppError(401, 'OAUTH_STATE_INVALID', 'Sign in again before linking an account.');
   const identity = await providers[provider].exchange(code, flow.verifier, flow.nonce);
   const account = await prisma.account.findUnique({
     where: { provider_providerAccountId: { provider, providerAccountId: identity.id } },
     select: { userId: true },
   });
   let userId = account?.userId;
+  if (flow.adminLogin && !flow.linkUserId && !userId)
+    throw new AppError(403, 'ADMIN_INVITATION_REQUIRED', 'Sign in with your administrator password and explicitly link this identity first.');
   if (flow.linkUserId) {
     if (userId && userId !== flow.linkUserId)
       throw new AppError(
@@ -171,7 +177,7 @@ export async function completeOAuth(
         'This provider identity is already linked.',
       );
     const user = await prisma.user.findFirst({
-      where: { id: flow.linkUserId, disabledAt: null, deletedAt: null },
+      where: { id: flow.linkUserId, disabledAt: null, deletedAt: null, ...(flow.adminLogin ? { role: { in: ['OWNER', 'ADMIN'] as ('OWNER' | 'ADMIN')[] } } : {}) },
       select: { id: true },
     });
     if (!user) throw new AppError(403, 'ACCOUNT_UNAVAILABLE', 'This account is unavailable.');
@@ -211,13 +217,15 @@ export async function completeOAuth(
   }
   const active = await prisma.user.findFirst({
     where: { id: userId, disabledAt: null, deletedAt: null },
-    select: { id: true, emailVerifiedAt: true },
+    select: { id: true, emailVerifiedAt: true, role: true },
   });
   if (!active) throw new AppError(403, 'ACCOUNT_UNAVAILABLE', 'This account is unavailable.');
   if (!active.emailVerifiedAt) throw new AppError(403, 'EMAIL_NOT_VERIFIED', 'Verify your email before signing in.');
+  if (flow.adminLogin && !['ADMIN', 'OWNER'].includes(active.role)) throw new AppError(403, 'ADMIN_INVITATION_REQUIRED', 'This identity is not an administrator.');
   await prisma.securityEvent.create({
     data: { userId, type: flow.linkUserId ? 'OAUTH_ACCOUNT_LINKED' : 'OAUTH_LOGIN' },
   });
-  await createSession(userId, response, { userAgent });
-  return 'dashboard' as const;
+  if (flow.adminLogin) await prisma.adminAuditLog.create({ data: { adminId: userId, action: flow.linkUserId ? 'ADMIN_PROVIDER_LINKED' : 'ADMIN_OAUTH_LOGIN', targetType: 'User', targetId: userId, userAgent: userAgent?.slice(0, 500), requestId: String(response.locals.requestId || '').slice(0, 100) || null } });
+  const sessionId = await createSession(userId, response, { userAgent, admin: !!flow.adminLogin });
+  return flow.adminLogin ? { adminUrl: await adminEntryUrl(sessionId) } : 'dashboard' as const;
 }

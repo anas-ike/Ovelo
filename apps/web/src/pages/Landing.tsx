@@ -7,8 +7,8 @@ export function Landing() {
       <header className="landing-nav">
         <Logo />
         <div className="landing-links">
-          <a href="#how">How it works</a>
-          <a href="#privacy">Privacy</a>
+          <Link to="/how-it-works">How it works</Link>
+          <Link to="/privacy">Privacy</Link>
           <Link className="text-link" to="/login">
             Sign in <ArrowRight size={15} />
           </Link>
@@ -36,9 +36,9 @@ export function Landing() {
               <Link className="button button-primary" to="/register">
                 Start your inventory <ArrowRight size={17} />
               </Link>
-              <a className="button button-ghost" href="#how">
+              <Link className="button button-ghost" to="/how-it-works">
                 See how it works
-              </a>
+              </Link>
             </div>
             <div className="hero-note">
               <LockKeyhole size={14} /> Private by design. Yours by default.
@@ -178,6 +178,7 @@ export function Landing() {
       <footer>
         <Logo />
         <span>Ovelo — Know what you own.</span>
+        <nav><Link to="/terms">Terms</Link> · <Link to="/privacy">Privacy</Link> · <Link to="/how-it-works">How it works</Link></nav>
         <span>© {new Date().getFullYear()} Ovelo</span>
       </footer>
     </div>

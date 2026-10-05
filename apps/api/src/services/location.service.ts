@@ -2,6 +2,7 @@ import { prisma } from '../database/prisma.js';
 import { AppError } from '../middleware/error.js';
 import type { z } from 'zod';
 import type { locationSchema } from '@ovelo/validation';
+import { validateMapsUrl } from './maps.service.js';
 type LocationInput = z.infer<typeof locationSchema>;
 async function assertParent(userId: string, parentId: string | null | undefined) {
   if (
@@ -18,15 +19,17 @@ export const listLocations = (userId: string) =>
       name: true,
       type: true,
       parentId: true,
-      _count: { select: { items: true, children: true } },
+      address: true, mapsUrl: true, latitude: true, longitude: true,
+      items: { where: { userId, deletedAt: null }, select: { id: true, name: true, status: true } },
+      _count: { select: { items: { where: { userId, deletedAt: null } }, children: true } },
     },
     orderBy: { name: 'asc' },
   });
 export async function createLocation(userId: string, input: LocationInput) {
   await assertParent(userId, input.parentId);
   return prisma.location.create({
-    data: { userId, name: input.name, type: input.type, parentId: input.parentId ?? null },
-    select: { id: true, name: true, type: true, parentId: true },
+    data: { ...input, userId, mapsUrl: input.mapsUrl ? validateMapsUrl(input.mapsUrl).toString() : null, parentId: input.parentId ?? null },
+    select: { id: true, name: true, type: true, parentId: true, address: true, mapsUrl: true, latitude: true, longitude: true },
   });
 }
 export async function deleteLocation(userId: string, id: string) {

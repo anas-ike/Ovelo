@@ -1,176 +1,52 @@
-import { useQuery } from '@tanstack/react-query';
-import {
-  Activity,
-  Boxes,
-  Database,
-  FileClock,
-  Globe2,
-  HardDrive,
-  LogOut,
-  Search,
-  Settings2,
-  ShieldAlert,
-  Users,
-} from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { get, post } from '../../lib/api';
+import { get, post, patch, del } from '../../lib/api';
 import { Logo } from '../../components/Logo';
+import { Button } from '../../components/Button';
+import { Field, Input } from '../../components/Field';
 import { Loading } from '../../components/Loading';
-type Overview = {
-  users: number;
-  items: number;
-  storageUsedBytes: string;
-  securityEvents24h: number;
-  failedJobs: number;
-};
-const sections = [
-  { id: 'overview', label: 'Overview', icon: Activity },
-  { id: 'users', label: 'Users', icon: Users },
-  { id: 'subscriptions', label: 'Subscriptions', icon: Boxes },
-  { id: 'domains', label: 'Email domains', icon: Globe2 },
-  { id: 'storage', label: 'Storage', icon: HardDrive },
-  { id: 'security', label: 'Security', icon: ShieldAlert },
-  { id: 'audit', label: 'Audit logs', icon: FileClock },
-  { id: 'jobs', label: 'Background jobs', icon: Database },
-  { id: 'settings', label: 'System settings', icon: Settings2 },
-];
+import { Modal } from '../../components/Modal';
+type Admin = { id: string; name: string; email: string; role: 'OWNER' | 'ADMIN'; isPrimaryAdmin: boolean; disabledAt: string | null };
+type Row = { id: string; name?: string; email?: string; role?: string; disabledAt?: string | null; itemCount?: number; action?: string; targetType?: string; targetId?: string; result?: string; createdAt?: string; admin?: { name: string; email: string } | null; state?: string; attempts?: number; errorCode?: string; type?: string; userId?: string; domain?: string; enabled?: boolean; user?: { name: string; email: string }; plan?: { name: string }; status?: string };
+const sections = ['overview', 'users', 'administrators', 'subscriptions', 'email-domains', 'security', 'audit', 'background-jobs', 'settings'];
 export function AdminPage() {
-  const [section, setSection] = useState('overview');
-  const navigate = useNavigate();
-  const overview = useQuery({
-    queryKey: ['admin-overview'],
-    queryFn: () => get<{ data: Overview }>('/admin/overview'),
-  });
-  const detail = useQuery({
-    queryKey: ['admin-detail', section],
-    queryFn: () =>
-      get<{ data: unknown }>(
-        `/admin/${section === 'users' ? 'users' : section === 'domains' ? 'domains' : section === 'security' ? 'security-events' : section === 'audit' ? 'audit-logs' : 'overview'}`,
-      ),
-    enabled: section !== 'overview',
-  });
-  const logout = async () => {
-    await post('/auth/logout').catch(() => undefined);
-    navigate('/admin/login');
-  };
-  return (
-    <div className="admin-shell">
-      <aside className="admin-sidebar">
-        <Logo />
-        <span className="admin-label">OPERATIONS</span>
-        <nav>
-          {sections.map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              className={section === id ? 'active' : ''}
-              onClick={() => setSection(id)}
-            >
-              <Icon size={16} />
-              {label}
-            </button>
-          ))}
-        </nav>
-        <button className="admin-logout" onClick={() => void logout()}>
-          <LogOut size={16} /> Sign out
-        </button>
-      </aside>
-      <main className="admin-main">
-        <header className="admin-topbar">
-          <div>
-            <span className="eyebrow">O VELO / ADMIN</span>
-            <h1>{sections.find((item) => item.id === section)?.label}</h1>
-          </div>
-          <span className="admin-status">
-            <i /> System nominal
-          </span>
-        </header>
-        <div className="admin-content">
-          {section === 'overview' ? (
-            overview.isLoading ? (
-              <Loading rows={5} />
-            ) : overview.error ? (
-              <div className="page-error">Admin session required.</div>
-            ) : (
-              <>
-                <div className="admin-metrics">
-                  <AdminMetric
-                    label="Accounts"
-                    value={overview.data!.data.users.toString()}
-                    icon={<Users size={17} />}
-                  />
-                  <AdminMetric
-                    label="Ownership records"
-                    value={overview.data!.data.items.toString()}
-                    icon={<Boxes size={17} />}
-                  />
-                  <AdminMetric
-                    label="Storage used"
-                    value={formatBytes(Number(overview.data!.data.storageUsedBytes))}
-                    icon={<HardDrive size={17} />}
-                  />
-                  <AdminMetric
-                    label="Security events / 24h"
-                    value={overview.data!.data.securityEvents24h.toString()}
-                    icon={<ShieldAlert size={17} />}
-                  />
-                </div>
-                <div className="admin-grid">
-                  <div className="admin-card">
-                    <span className="eyebrow">SYSTEM NOTES</span>
-                    <h2>Keep the private layer private.</h2>
-                    <p>
-                      Administrator access exposes account metadata, operations, and security
-                      telemetry. User documents remain scoped to their ownership records and are not
-                      automatically available in this console.
-                    </p>
-                  </div>
-                  <div className="admin-card admin-job-card">
-                    <span className="eyebrow">JOB HEALTH</span>
-                    <strong>{overview.data!.data.failedJobs}</strong>
-                    <p>failed migration jobs require attention</p>
-                  </div>
-                </div>
-              </>
-            )
-          ) : detail.isLoading ? (
-            <Loading rows={5} />
-          ) : (
-            <div className="admin-card">
-              <div className="admin-card-head">
-                <div>
-                  <span className="eyebrow">LIVE DATA</span>
-                  <h2>{sections.find((item) => item.id === section)?.label}</h2>
-                </div>
-                <Search size={18} />
-              </div>
-              <pre className="admin-json">{JSON.stringify(detail.data?.data, null, 2)}</pre>
-            </div>
-          )}
-        </div>
-      </main>
-    </div>
-  );
+  const location = useLocation(), navigate = useNavigate(), client = useQueryClient(); const section = location.pathname.split('/')[2] || 'overview';
+  const me = useQuery({ queryKey: ['admin-me'], queryFn: () => get<{ data: Admin }>('/admin/me'), retry: false });
+  const [error, setError] = useState(''), [message, setMessage] = useState(''), [busy, setBusy] = useState(false), [create, setCreate] = useState(false), [q, setQ] = useState('');
+  const endpoint = section === 'email-domains' ? 'domains' : section === 'audit' ? 'audit-logs' : section === 'security' ? 'security-events' : section;
+  const data = useQuery({ queryKey: ['admin-section', section, q], queryFn: () => get<{ data: Row[] }>(`/admin/${endpoint}?q=${encodeURIComponent(q)}`), enabled: !!me.data && !['overview', 'settings'].includes(section) && sections.includes(section) });
+  const overview = useQuery({ queryKey: ['admin-overview'], queryFn: () => get<{ data: { users: number; items: number; storageUsedBytes: string; failedJobs: number; securityEvents24h: number } }>('/admin/overview'), enabled: section === 'overview' && !!me.data });
+  async function action(fn: () => Promise<unknown>, success: string) { setBusy(true); setError(''); setMessage(''); try { await fn(); await client.invalidateQueries({ queryKey: ['admin-section'] }); setMessage(success); } catch (e) { setError(e instanceof Error ? e.message : 'Operation failed.'); } finally { setBusy(false); } }
+  if (me.isPending) return <Loading rows={3} />;
+  if (me.error) return <p className="page-error">Administrator session required. <Link to="/admin/login">Sign in</Link></p>;
+  const owner = me.data.data.role === 'OWNER';
+  return <div className="admin-shell"><aside className="admin-sidebar"><Logo /><span className="admin-label">OPERATIONS · {me.data.data.role}</span><nav>{sections.filter(s => owner || !['administrators', 'security'].includes(s)).map(s => <NavLink className={({ isActive }) => isActive ? 'active' : ''} key={s} to={s === 'overview' ? '/admin' : `/admin/${s}`} end>{s.replace(/-/g, ' ')}</NavLink>)}</nav><Button variant="ghost" disabled={busy} onClick={() => void action(async () => { await post('/admin/logout'); client.removeQueries({ queryKey: ['admin-me'] }); window.location.assign('/admin/login'); }, 'Signed out.')}>Sign out</Button></aside>
+  <main className="admin-main"><header className="admin-topbar"><div><span className="eyebrow">OVELO / ADMIN</span><h1>{section.replace(/-/g, ' ')}</h1></div><span>{me.data.data.isPrimaryAdmin ? 'Primary owner' : me.data.data.role}</span></header><div className="admin-content">{error && <p role="alert" className="form-alert">{error}</p>}{message && <p role="status" className="success-note">{message}</p>}
+    {section === 'overview' ? overview.isPending ? <Loading rows={4} /> : overview.error ? <p role="alert">Could not load overview.</p> : <div className="admin-metrics">{Object.entries(overview.data.data).map(([label, value]) => <div key={label} className="admin-metric"><small>{label.replace(/([A-Z])/g, ' $1')}</small><strong>{String(value)}</strong></div>)}</div> : section === 'settings' ? <AdminSettings admin={me.data.data} onChanged={() => navigate('/admin/login')} /> : !sections.includes(section) ? <p>Section not found. <Link to="/admin">Overview</Link></p> : <>
+    <div className="section-head"><Field label="Search"><Input value={q} onChange={e => setQ(e.target.value)} maxLength={100} placeholder={section === 'audit' ? 'Filter actions' : 'Search records'} /></Field>{section === 'administrators' && owner && <Button onClick={() => setCreate(true)}>Add administrator</Button>}</div>
+    {data.isPending ? <Loading rows={4} /> : data.error ? <p role="alert" className="form-alert">{data.error.message}</p> : !data.data?.data.length ? <p className="inline-empty">No records found.</p> : <div className="records-stack">{data.data.data.filter(r => ['users', 'audit'].includes(section) || JSON.stringify(r).toLowerCase().includes(q.toLowerCase())).map(r => <article className="record-card" key={r.id}><div><h3>{r.name || r.action || r.domain || r.type || r.user?.name || `${r.state || 'Record'}`}</h3><p>{r.email || r.admin?.name || r.user?.email}</p><p>{[r.role, r.result, r.status, r.plan?.name, r.state, r.errorCode].filter(Boolean).join(' · ')}</p>{r.disabledAt !== undefined && <p>{r.disabledAt ? 'Disabled' : 'Enabled'}</p>}<p>{r.targetType}{r.targetId ? ` · ${r.targetId}` : ''}</p>{r.createdAt && <small>{new Date(r.createdAt).toLocaleString()}</small>}{r.itemCount !== undefined && <small>{r.itemCount} items</small>}</div>
+      {section === 'administrators' && owner && r.id !== me.data.data.id && !(r as Row & { isPrimaryAdmin?: boolean }).isPrimaryAdmin && <div className="record-actions"><Button disabled={busy} variant="ghost" onClick={() => void action(() => patch(`/admin/administrators/${r.id}`, { disabled: !(r as Row & { disabledAt: string | null }).disabledAt }), 'Administrator status updated.')}>{(r as Row & { disabledAt: string | null }).disabledAt ? 'Enable' : 'Disable'}</Button><Button variant="ghost" disabled={busy} onClick={() => { if (window.confirm('Change this administrator’s role and revoke existing sessions?')) void action(() => patch(`/admin/administrators/${r.id}`, { role: r.role === 'OWNER' ? 'ADMIN' : 'OWNER' }), 'Role updated.'); }}>Make {r.role === 'OWNER' ? 'ADMIN' : 'OWNER'}</Button><Button disabled={busy} variant="ghost" onClick={() => void action(() => post(`/admin/administrators/${r.id}/revoke-sessions`), 'Sessions revoked.')}>Revoke sessions</Button><Button disabled={busy} variant="ghost" onClick={() => void action(() => post(`/admin/administrators/${r.id}/reset`), 'Recovery email requested.')}>Request reset</Button><Button disabled={busy} variant="ghost" onClick={() => { if (window.confirm('Remove administrator privileges? The user account and records remain.')) void action(() => del(`/admin/administrators/${r.id}`), 'Administrator removed.'); }}>Remove</Button></div>}
+      {section === 'background-jobs' && r.state === 'FAILED' && <Button disabled={busy} onClick={() => void action(() => post(`/admin/background-jobs/${r.id}/retry`), 'Job queued for retry.')}>Retry job</Button>}
+      {section === 'users' && r.role === 'USER' && <Button variant="ghost" disabled={busy} onClick={() => { if (r.disabledAt || window.confirm('Disable this user and revoke their active sessions?')) void action(() => patch(`/admin/users/${r.id}`, { disabled: !r.disabledAt }), 'User status updated.'); }}>{r.disabledAt ? 'Enable user' : 'Disable user'}</Button>}
+    </article>)}</div>}
+    {section === 'email-domains' && owner && <DomainForm onSave={body => action(() => post('/admin/domains', body), 'Domain saved.')} />}
+    </>}
+  </div></main>{create && <CreateAdmin onClose={() => setCreate(false)} onSave={body => action(async () => { await post('/admin/administrators', body); setCreate(false); }, 'Administrator added.')} />}</div>;
 }
-function AdminMetric({
-  label,
-  value,
-  icon,
-}: {
-  label: string;
-  value: string;
-  icon: React.ReactNode;
-}) {
-  return (
-    <div className="admin-metric">
-      <span>{icon}</span>
-      <small>{label}</small>
-      <strong>{value}</strong>
-    </div>
-  );
+function CreateAdmin({ onClose, onSave }: { onClose: () => void; onSave: (body: unknown) => Promise<void> }) { const [email, setEmail] = useState(''), [name, setName] = useState(''), [password, setPassword] = useState(''), [busy, setBusy] = useState(false); return <Modal title="Add administrator" onClose={onClose}><form className="records-stack" onSubmit={e => { e.preventDefault(); setBusy(true); void onSave({ email, name, ...(password ? { password } : {}) }).finally(() => setBusy(false)); }}><p>An existing verified account can be invited without changing its password. Provider identities must be linked by that administrator after signing in.</p><Field label="Name"><Input required value={name} onChange={e => setName(e.target.value)} /></Field><Field label="Email"><Input type="email" required value={email} onChange={e => setEmail(e.target.value)} /></Field><Field label="Initial password (new accounts only)" hint="16–128 characters. Never send this password in an audit log."><Input type="password" minLength={16} maxLength={128} value={password} onChange={e => setPassword(e.target.value)} autoComplete="new-password" /></Field><Button type="submit" loading={busy}>Add administrator</Button></form></Modal>; }
+function AdminSettings({ admin, onChanged }: { admin: Admin; onChanged: () => void }) { const [currentPassword, setCurrent] = useState(''), [password, setPassword] = useState(''), [error, setError] = useState(''), [busy, setBusy] = useState(false); const q = useQuery({ queryKey: ['admin-accounts'], queryFn: () => get<{ data: { provider: string }[] }>('/admin/accounts') }); return <div className="records-stack">{admin.isPrimaryAdmin && <PrimaryProfile admin={admin} />}<section className="admin-card records-stack"><h2>Account security</h2>{error && <p role="alert" className="form-alert">{error}</p>}<form className="records-stack" onSubmit={e => { e.preventDefault(); setBusy(true); setError(''); void post('/admin/change-password', { currentPassword, password }).then(onChanged).catch(e => setError(e.message)).finally(() => setBusy(false)); }}><Field label="Current password"><Input type="password" required value={currentPassword} onChange={e => setCurrent(e.target.value)} autoComplete="current-password" /></Field><Field label="New password"><Input type="password" minLength={16} maxLength={128} required value={password} onChange={e => setPassword(e.target.value)} autoComplete="new-password" /></Field><Button loading={busy} type="submit">Change password & revoke sessions</Button></form><h3>Linked provider identities</h3>{q.error ? <p role="alert">Could not load linked providers.</p> : <p>{q.data?.data.map(a => a.provider).join(', ') || 'No linked providers.'}</p>}{(['google', 'discord'] as const).map(p => <Button key={p} variant="ghost" disabled={busy} onClick={() => { setBusy(true); void post<{ data: { url: string } }>(`/admin/providers/${p}/link`).then(r => window.location.assign(r.data.url)).catch(e => setError(e.message)).finally(() => setBusy(false)); }}>Connect {p === 'google' ? 'Google' : 'Discord'}</Button>)}<Link to="/admin/forgot-password">Request recovery email</Link></section></div>; }
+function PrimaryProfile({ admin }: { admin: Admin }) {
+  const client = useQueryClient();
+  const [name, setName] = useState(admin.name), [email, setEmail] = useState(admin.email), [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false), [error, setError] = useState(''), [message, setMessage] = useState('');
+  return <form className="admin-card records-stack" onSubmit={e => { e.preventDefault(); setBusy(true); setError(''); setMessage(''); void patch<{ data: { verificationRequired: boolean } }>('/admin/primary-profile', { name, email, currentPassword: password }).then(async result => { setPassword(''); setMessage(result.data.verificationRequired ? 'Name saved. Verify the new email using the link sent to that address. Verification revokes sessions; update ADMIN_EMAIL to the verified address before restarting.' : 'Primary owner profile saved.'); await client.invalidateQueries({ queryKey: ['admin-me'] }); }).catch(e => setError(e.message)).finally(() => setBusy(false)); }}>
+    <h2>Primary owner profile</h2><p>Email changes require confirmation at the new address before replacing the current email.</p>
+    {error && <p role="alert" className="form-alert">{error}</p>}{message && <p role="status" className="success-note">{message}</p>}
+    <Field label="Owner name"><Input required maxLength={100} value={name} onChange={e => setName(e.target.value)} autoComplete="name" /></Field>
+    <Field label="Owner email"><Input type="email" required value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" /></Field>
+    <Field label="Confirm owner password"><Input type="password" required maxLength={128} value={password} onChange={e => setPassword(e.target.value)} autoComplete="current-password" /></Field>
+    <Button type="submit" loading={busy}>Save owner profile</Button>
+  </form>;
 }
-function formatBytes(value: number) {
-  return value > 1024 ** 3
-    ? `${(value / 1024 ** 3).toFixed(1)} GB`
-    : `${Math.round(value / 1024 ** 2)} MB`;
-}
+function DomainForm({ onSave }: { onSave: (body: unknown) => Promise<void> }) { const [domain, setDomain] = useState(''), [enabled, setEnabled] = useState(true); return <form className="admin-card records-stack" onSubmit={e => { e.preventDefault(); void onSave({ domain, enabled, providerType: 'BUSINESS' }); }}><h3>Email domain policy</h3><Field label="Domain"><Input required value={domain} onChange={e => setDomain(e.target.value)} placeholder="company.example" /></Field><label className="check-row"><input type="checkbox" checked={enabled} onChange={e => setEnabled(e.target.checked)} />Enabled</label><Button type="submit">Save domain</Button></form>; }

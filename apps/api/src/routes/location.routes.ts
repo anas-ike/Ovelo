@@ -8,12 +8,15 @@ import {
   createCategoryController,
   containersController,
   createContainerController,
+  parseMapsController, searchLocationController,
 } from '../controllers/location.controller.js';
 export const locationRouter = Router();
 locationRouter.use(requireAuth);
 locationRouter.get('/categories', categoriesController);
 locationRouter.post('/categories', csrf, createCategoryController);
 locationRouter.get('/locations', locationsController);
+locationRouter.get('/locations/search', searchLocationController);
+locationRouter.post('/locations/parse-maps', csrf, parseMapsController);
 locationRouter.post('/locations', csrf, createLocationController);
 locationRouter.delete('/locations/:id', csrf, deleteLocationController);
 locationRouter.get('/containers', containersController);

@@ -12,7 +12,7 @@ export interface UserProfile {
   id: string;
   name: string;
   email: string;
-  role: 'USER' | 'ADMIN';
+  role: 'USER' | 'ADMIN' | 'OWNER';
   emailVerifiedAt: string | null;
 }
 export interface ItemSummary {

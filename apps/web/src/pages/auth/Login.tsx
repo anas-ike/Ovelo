@@ -17,6 +17,7 @@ export function Login() {
     ACCOUNT_UNAVAILABLE: 'This account is unavailable.',
     EMAIL_DOMAIN_REQUIRES_APPROVAL: 'Your email domain requires administrator approval.',
     OAUTH_FAILED: 'Provider sign-in could not be completed. Please try again.',
+    ADMIN_INVITATION_REQUIRED: 'Administrator identities must be explicitly invited and linked. Use your administrator password to sign in.',
   };
   const providerError = oauthErrors[new URLSearchParams(location.search).get('oauthError') || ''];
   const [email, setEmail] = useState('');

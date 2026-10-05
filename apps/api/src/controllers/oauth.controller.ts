@@ -21,16 +21,16 @@ export const discordStart = asyncHandler(async (_req, res) => res.redirect(await
 
 async function callback(provider: 'google' | 'discord', req: Request, res: Response) {
   try {
-    const destination = await completeOAuth(provider, typeof req.query.state === 'string' ? req.query.state : undefined, req.cookies?.ovelo_oauth_state, typeof req.query.code === 'string' ? req.query.code : '', res, req.get('user-agent'), req.auth?.userId);
+    const destination = await completeOAuth(provider, typeof req.query.state === 'string' ? req.query.state : undefined, req.cookies?.ovelo_oauth_state, typeof req.query.code === 'string' ? req.query.code : '', res, req.get('user-agent'), req.auth?.userId, req.adminAuth?.userId);
     // Only server-defined destinations are accepted, never query-supplied redirects.
-    res.redirect(`${env.APP_URL}/${destination === 'register' ? 'register?oauth=complete' : 'dashboard'}`);
+    res.redirect(typeof destination === 'object' ? destination.adminUrl : `${env.APP_URL}/${destination === 'register' ? 'register?oauth=complete' : 'dashboard'}`);
   } catch (error) {
     if (!(error instanceof AppError)) {
       // Never log provider payloads, authorization codes, tokens or query strings.
       logger.error({ provider, errorType: error instanceof Error ? error.name : 'UnknownError', requestId: res.locals.requestId }, 'OAuth callback failed');
       return res.redirect(`${env.APP_URL}/login?oauthError=OAUTH_FAILED`);
     }
-    const allowed = ['LINK_REQUIRED','EMAIL_NOT_VERIFIED','OAUTH_STATE_INVALID','ACCOUNT_ALREADY_LINKED','ACCOUNT_UNAVAILABLE','EMAIL_DOMAIN_REQUIRES_APPROVAL'];
+    const allowed = ['LINK_REQUIRED','EMAIL_NOT_VERIFIED','OAUTH_STATE_INVALID','ACCOUNT_ALREADY_LINKED','ACCOUNT_UNAVAILABLE','EMAIL_DOMAIN_REQUIRES_APPROVAL','ADMIN_INVITATION_REQUIRED'];
     const code = allowed.includes(error.code) ? error.code : 'OAUTH_FAILED';
     res.redirect(`${env.APP_URL}/login?oauthError=${code}`);
   }

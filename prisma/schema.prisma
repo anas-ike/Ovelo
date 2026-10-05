@@ -8,6 +8,7 @@ datasource db {
 enum Role {
   USER
   ADMIN
+  OWNER
 }
 enum ItemStatus {
   OWNED
@@ -50,6 +51,7 @@ model User {
   name String
   passwordHash String?
   role Role @default(USER)
+  isPrimaryAdmin Boolean @default(false)
   emailVerifiedAt DateTime?
   disabledAt DateTime?
   deletedAt DateTime?
@@ -113,6 +115,7 @@ model PasswordReset {
   id String @id @default(uuid()) @db.Uuid
   userId String @db.Uuid
   tokenHash String @unique
+  admin Boolean @default(false)
   expiresAt DateTime
   createdAt DateTime @default(now())
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -137,6 +140,7 @@ model Item {
   modelNumber String?
   manufacturer String?
   notes String?
+  condition String?
   saleDate DateTime?
   salePrice Decimal? @db.Decimal(15,3)
   buyerNote String?
@@ -178,6 +182,10 @@ model Location {
   userId String @db.Uuid
   name String
   type String @default("HOME")
+  address String?
+  latitude Float?
+  longitude Float?
+  mapsUrl String?
   parentId String? @db.Uuid
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -226,6 +234,7 @@ model Document {
   storageObject StorageObject @relation(fields: [storageObjectId], references: [id], onDelete: Restrict)
   receipt Receipt?
   repairDocuments RepairDocument[]
+  warrantyDocuments WarrantyDocument[]
   @@index([itemId, kind])
 }
 model Receipt {
@@ -243,10 +252,14 @@ model Warranty {
   endDate DateTime
   provider String?
   warrantyNumber String?
+  planType String?
+  coverage String?
+  notes String?
   notificationDays Int[] @default([90,30,7,1])
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  documents WarrantyDocument[]
   @@index([endDate])
   @@index([itemId])
 }
@@ -259,11 +272,20 @@ model Repair {
   cost Decimal @db.Decimal(15,3)
   currency String @db.VarChar(3)
   description String?
+  notes String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
   documents RepairDocument[]
   @@index([itemId])
+}
+model WarrantyDocument {
+  id String @id @default(uuid()) @db.Uuid
+  warrantyId String @db.Uuid
+  documentId String @db.Uuid
+  warranty Warranty @relation(fields: [warrantyId], references: [id], onDelete: Cascade)
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  @@unique([warrantyId, documentId])
 }
 model RepairDocument {
   id String @id @default(uuid()) @db.Uuid
@@ -289,6 +311,8 @@ model Barcode {
   value String
   format String @default("CODE128")
   createdAt DateTime @default(now())
+  revokedAt DateTime?
+  expiresAt DateTime?
   item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
   @@unique([itemId, value])
   @@index([value])
@@ -298,6 +322,7 @@ model QrCode {
   itemId String @unique @db.Uuid
   code String @unique
   revokedAt DateTime?
+  expiresAt DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
@@ -415,12 +440,15 @@ model Subscription {
 }
 model AdminAuditLog {
   id String @id @default(uuid()) @db.Uuid
-  adminId String @db.Uuid
+  adminId String? @db.Uuid
   action String
   targetType String
   targetId String?
+  result String @default("SUCCESS")
+  requestId String?
+  userAgent String?
   createdAt DateTime @default(now())
-  admin User @relation(fields: [adminId], references: [id], onDelete: Restrict)
+  admin User? @relation(fields: [adminId], references: [id], onDelete: SetNull)
   @@index([createdAt])
 }
 model AllowedEmailDomain {

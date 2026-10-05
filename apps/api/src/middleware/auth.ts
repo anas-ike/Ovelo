@@ -1,55 +1,33 @@
 import type { RequestHandler } from 'express';
+import type { Role } from '@prisma/client';
 import { prisma } from '../database/prisma.js';
 import { hashToken, safeEquals } from '../utils/crypto.js';
 import { env } from '../config/env.js';
 import { AppError } from './error.js';
-import type { Role } from '@prisma/client';
-declare global {
-  namespace Express {
-    interface Request {
-      auth?: { userId: string; sessionId: string; role: Role; admin: boolean; csrfHash: string };
-    }
-  }
-}
+import { adminSessionCookie, adminCsrfCookie } from '../auth/session.service.js';
+type Authentication = { userId: string; sessionId: string; role: Role; admin: boolean; csrfHash: string; isPrimaryAdmin: boolean };
+declare global { namespace Express { interface Request { auth?: Authentication; adminAuth?: Authentication; } } }
 export const loadSession: RequestHandler = async (req, _res, next) => {
   try {
-    const raw = req.cookies?.[env.SESSION_COOKIE_NAME] as string | undefined;
-    if (!raw) return next();
-    const session = await prisma.session.findFirst({
-      where: { tokenHash: hashToken(raw), expiresAt: { gt: new Date() } },
-      select: {
-        id: true,
-        userId: true,
-        csrfHash: true,
-        admin: true,
-        user: { select: { role: true, disabledAt: true, deletedAt: true } },
-      },
-    });
-    if (session && !session.user.disabledAt && !session.user.deletedAt)
-      req.auth = {
-        userId: session.userId,
-        sessionId: session.id,
-        role: session.user.role,
-        admin: session.admin,
-        csrfHash: session.csrfHash,
-      };
-    return next();
-  } catch (error) {
-    return next(error);
-  }
+    async function load(raw: unknown, admin: boolean): Promise<Authentication | undefined> {
+      if (typeof raw !== 'string' || !/^[a-f0-9]{64}$/.test(raw)) return;
+      const session = await prisma.session.findFirst({ where: { tokenHash: hashToken(raw), admin, expiresAt: { gt: new Date() }, user: { deletedAt: null, disabledAt: null } },
+        select: { id: true, userId: true, csrfHash: true, admin: true, user: { select: { role: true, isPrimaryAdmin: true } } } });
+      if (!session || admin && !['OWNER', 'ADMIN'].includes(session.user.role)) return;
+      return { userId: session.userId, sessionId: session.id, role: session.user.role, isPrimaryAdmin: session.user.isPrimaryAdmin, admin, csrfHash: session.csrfHash };
+    }
+    req.adminAuth = await load(req.cookies?.[adminSessionCookie], true);
+    req.auth = req.path.startsWith('/api/v1/admin') ? req.adminAuth : await load(req.cookies?.[env.SESSION_COOKIE_NAME], false);
+    next();
+  } catch (error) { next(error); }
 };
-export const requireAuth: RequestHandler = (req, _res, next) =>
-  req.auth ? next() : next(new AppError(401, 'UNAUTHENTICATED', 'Sign in to continue.'));
-export const requireAdmin: RequestHandler = (req, _res, next) =>
-  req.auth?.admin && req.auth.role === 'ADMIN'
-    ? next()
-    : next(new AppError(403, 'FORBIDDEN', 'Administrator access is required.'));
+export const requireAuth: RequestHandler = (req, _res, next) => req.auth ? next() : next(new AppError(401, 'UNAUTHENTICATED', 'Sign in to continue.'));
+export const requireAdmin: RequestHandler = (req, _res, next) => req.auth?.admin && ['ADMIN', 'OWNER'].includes(req.auth.role) ? next() : next(new AppError(403, 'FORBIDDEN', 'Administrator access is required.'));
+export const requireOwner: RequestHandler = (req, _res, next) => req.auth?.admin && req.auth.role === 'OWNER' ? next() : next(new AppError(403, 'OWNER_REQUIRED', 'Owner access is required.'));
 export const csrf: RequestHandler = (req, _res, next) => {
-  if (!env.CSRF_ENABLED || ['GET', 'HEAD', 'OPTIONS'].includes(req.method) || !req.auth)
-    return next();
+  if (!env.CSRF_ENABLED || ['GET', 'HEAD', 'OPTIONS'].includes(req.method) || !req.auth) return next();
   const header = req.header('x-csrf-token');
-  const cookie = req.cookies?.ovelo_csrf as string | undefined;
-  if (!header || !cookie || !safeEquals(header, cookie) || hashToken(cookie) !== req.auth.csrfHash)
-    return next(new AppError(403, 'CSRF_INVALID', 'Security token missing or invalid.'));
+  const cookie: unknown = req.cookies?.[req.auth.admin ? adminCsrfCookie : 'ovelo_csrf'];
+  if (!header || typeof cookie !== 'string' || !safeEquals(header, cookie) || hashToken(cookie) !== req.auth.csrfHash) return next(new AppError(403, 'CSRF_INVALID', 'Security token missing or invalid.'));
   next();
 };

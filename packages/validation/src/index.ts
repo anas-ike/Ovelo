@@ -10,6 +10,7 @@ export const email = z
   .max(254)
   .transform((v) => v.toLowerCase());
 export const password = z.string().min(12, 'Use at least 12 characters').max(128);
+export const adminPassword = z.string().min(16, 'Use at least 16 characters').max(128);
 export const registerSchema = z.object({ name: text(100).min(1), email, password }).strict();
 export const loginSchema = z.object({ email, password: z.string().min(1).max(128) }).strict();
 export const emailChangeSchema = z.object({ email }).strict();
@@ -50,6 +51,7 @@ export const itemSchema = z
     modelNumber: nullableText(200),
     manufacturer: nullableText(200),
     notes: nullableText(10000),
+    condition: nullableText(200),
     barcode: nullableText(100),
   })
   .strict();
@@ -69,6 +71,10 @@ export const locationSchema = z
     name: text(100).min(1),
     parentId: uuid.nullish(),
     type: z.enum(['HOME', 'OFFICE', 'CAR', 'STORAGE', 'OTHER']).default('HOME'),
+    address: nullableText(500),
+    latitude: z.number().min(-90).max(90).nullish(),
+    longitude: z.number().min(-180).max(180).nullish(),
+    mapsUrl: z.string().max(2048).nullish(),
   })
   .strict();
 export const containerSchema = z
@@ -85,10 +91,14 @@ export const warrantySchema = z
     endDate: z.string().datetime({ offset: true }),
     provider: nullableText(200),
     warrantyNumber: nullableText(200),
+    planType: nullableText(200),
+    coverage: nullableText(4000),
+    notes: nullableText(4000),
+    documentIds: z.array(uuid).max(30).default([]),
     notificationDays: z.array(z.number().int().min(1).max(365)).max(10).default([90, 30, 7, 1]),
   })
   .strict()
-  .refine((v) => v.endDate >= v.startDate, {
+  .refine((v) => new Date(v.endDate).getTime() >= new Date(v.startDate).getTime(), {
     message: 'Warranty end must follow start',
     path: ['endDate'],
   });
@@ -100,6 +110,8 @@ export const repairSchema = z
     cost: z.coerce.number().min(0).max(999999999),
     currency: z.string().regex(/^[A-Z]{3}$/),
     description: nullableText(4000),
+    notes: nullableText(4000),
+    documentIds: z.array(uuid).max(30).default([]),
   })
   .strict();
 export const saleSchema = z

@@ -2,6 +2,31 @@
 
 Every meaningful production pass adds a release here and in [CHANGELOG.js](CHANGELOG.js). The root package version is the application version. See [release workflow](docs/releases.md) and [production verification](docs/production-verification.md). Previous history is retained.
 
+## v0.2.0 — Ownership Records and Administrator Security
+Date: 2026-10-05
+
+### Added / Fixed
+- Functional item tabs; documents, warranty and repair records, attachments, item activity and location selection.
+- User-scoped global document/location pages and safe Google Maps link parsing.
+- Opaque QR/barcode generation, PNG/SVG download, local camera/image scanning and manual fallback.
+- Server-gated admin pages, separate secure sessions, owner/admin roles, administrator management, audit and recovery.
+- Secure `npm run resetpass` and explicit primary-admin bootstrap.
+- Public help, Terms and Privacy destinations.
+
+### Verification
+- Build, typecheck and lint: PASS. Dedicated PostgreSQL/Redis tests: **50 passed (7 root + 43 API), none skipped**. Provider exchanges and SMTP are simulated in the authentication integration suite.
+- Isolated browser workflows: PASS — item creation with document/location, tabs, warranty/repair editing, activity, generated PNG/SVG labels, real QR/Code 128 image decoding and manual resolution, administrator gate/login, secondary creation, owner profile, user enable/disable, audit and logout revocation.
+- Camera opt-in, generated-frame decoding, stream cleanup and denied-camera fallback: PASS. Physical-device camera capture: NOT TESTED.
+- Secure interactive CLI recovery: PASS on a dedicated database — hidden TTY input, short-password rejection, hash update, session/reset-ticket revocation and audit. Fixed a prompt ordering race that could echo immediately pasted input.
+- Deployed v0.2.0 through the existing Pterodactyl workflow; additive migration `20261005130000_functional_completion` applied. Existing production records preserved. Web/API/worker startup and unchanged allocations: PASS.
+- Real production public/auth/recovery pages on desktop/mobile, nine administrator HTML redirects, ten unauthenticated administrator API rejections, protected lazy admin bundle and unsigned-gate rejection: PASS.
+- Real Google/Discord authorization initialization, state/nonce/PKCE protections, invalid codes, replay/expiry, CORS/origin rejection and login rate limiting: PASS.
+- Google/Discord successful consent and authenticated production feature workflows: **BLOCKED — authorized browser/account unavailable**.
+- Primary administrator provisioning: FAIL — configured `ADMIN_PASSWORD` does not satisfy the existing 16–128-character policy. SMTP authentication: FAIL — server rejected configured credentials with `EAUTH`; delivery remains blocked.
+- PDF uploads remain fail-closed because `CLAMAV_HOST` is absent. Optional Places search is unconfigured; manual address selection and Google Maps links work.
+- **Verdict: PARTIAL — deployed and verified with dedicated accounts; full live authenticated functionality remains incomplete.** See the versioned evidence and operator follow-up in [production verification](docs/production-verification.md).
+- Secret checks: PASS — intended staged files, configured-credential matching, signatures/history, deployed frontend and inspected startup logs; `.env` ignored and excluded.
+
 ## v0.1.2 — Production Deployment and Live Authentication Verification
 Date: 2026-10-05
 

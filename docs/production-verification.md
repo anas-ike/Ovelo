@@ -1,163 +1,104 @@
 # Ovelo Production Verification
 
-**Ovelo v0.1.2 — Production Deployment and Live Authentication Verification**
+Ovelo v0.2.0 — Ownership Records and Administrator Security
 
-**Date:** 2026-10-05
+Date: 2026-10-05
 
-**Executive Verdict: FAILED — full authentication verification incomplete**
+## Executive result
 
-## Executive verdict
+**PARTIAL — v0.2.0 is deployed and isolated authenticated workflows pass. Full live authenticated feature verification remains incomplete; production administrator provisioning and SMTP authentication need correction.**
 
-Ovelo v0.1.2 is deployed and operational on the existing production domains and allocations. PostgreSQL has the reviewed schema and required initial plans. Redis-backed protection and OAuth initialization now work. Real browser provider authorization and negative security tests passed.
+The existing architecture, domains, proxy configuration and allocations were preserved. No successful Google/Discord consent, production user session or authenticated production item workflow is claimed. Previous release evidence is preserved in [v0.1.2](production-verification-v0.1.2.md).
 
-Full authentication verification is incomplete: the owner confirmed that no authorized Google/Discord browser/account is available. The configured administrator could not be provisioned because `ADMIN_PASSWORD` fails the existing policy, and `SMTP_PASSWORD` is absent. No real authenticated user session was created or fabricated. Successful OAuth login/signup, authenticated CSRF, session persistence and logout/revocation therefore remain blocked. The overall verdict is FAILED, despite the infrastructure checks passing.
+## Scope delivered
 
-## Actual results
+- Working item Overview, Documents, Warranty, Repairs and Activity tabs, editable ownership fields, condition/value, secure creation-time attachments and partial-upload retry.
+- Ownership-scoped document listing/preview/download/delete, warranty/repair CRUD and attachments, item activity, and global Documents/Locations/Activity pages.
+- Saved-location/manual-address selection, validated Google Maps links/coordinates and bounded allowlisted sharing-link expansion. Optional server-side Places search uses `GOOGLE_MAPS_API_KEY`.
+- Explicit opaque QR/Code 128 generation, PNG/SVG download, regeneration/expiry/revocation checks and authorization-bound resolution. Local image/camera decoding and manual fallback.
+- Separate short-lived administrator sessions and CSRF cookies; OWNER/ADMIN restrictions; primary-owner protection/profile controls; secondary administration; user enable/disable; audit; session revocation; expiring, single-use recovery.
+- Administrator HTML and lazy bundle server gates bound to the live database administrator session, plus SPA/API authorization. One-use entry tickets bridge the existing separate web/API hosts without widening API session-cookie scope.
+- Explicit Google/Discord administrator identity linking. Normal sessions cannot stand in for administrator sessions during linking, even when both cookies are present.
+- Interactive `npm run resetpass`, with hidden TTY input, enforced policy, database-authoritative password changes, revocation and audit. Restart bootstrap never overwrites a stored password.
+- Public How it Works, Terms and Privacy pages and connected navigation/footer links.
 
-| Check | Result |
+## Build and dedicated-service checks
+
+| Check | Observed result |
 | --- | --- |
-| Production deployment | PASS — v0.1.2 deployed to the existing server |
-| PostgreSQL migration/schema | PASS — both existing migrations applied, schema up to date |
-| Required initial plans | PASS — 2 plans, 8 entitlements, 7 system categories |
-| Optional administrator provisioning | FAIL — `ADMIN_PASSWORD` does not satisfy existing policy |
-| Redis | PASS — verified TLS/SNI/auth/commands, queues and reconnect |
-| Request protection | PASS — real rate limit/origin/unauthenticated rejection; fail-closed startup |
-| CSRF | PARTIAL — unauthenticated rejection/CORS passed; authenticated checks BLOCKED |
-| Google authorization initialization | PASS — real Google authorization page reached |
-| Google OAuth login/signup | **BLOCKED — authorized browser/account unavailable** |
-| Discord authorization initialization | PASS — real Discord authorization page reached |
-| Discord OAuth login/signup/linking | **BLOCKED — authorized browser/account unavailable** |
-| Authenticated session/persistence | BLOCKED — actual authenticated account unavailable |
-| Logout/session revocation/reuse | BLOCKED — actual authenticated account unavailable |
-| SMTP/email delivery | BLOCKED — `SMTP_PASSWORD` absent |
-| Web health | PASS — production HTTPS page responds 200 |
-| API health | PASS — production HTTPS health responds 200 and reports v0.1.2 |
-| Startup | PASS — deployed web/API/worker remain alive; ports unchanged |
-| Deployed SIGTERM/SIGINT | PASS — exit 0; all three services restart |
-| Git secret check | PASS — staged source, actual-value/signature/URL scans, deployed artifacts/logs |
+| Production-environment build | PASS — shared/API/worker/web; root version and HTML/API metadata `0.2.0` |
+| Typecheck / lint / whitespace | PASS — `npm run typecheck`, `npm run lint`, `git diff --check` |
+| Dedicated automated tests | PASS — **7 root + 43 API = 50 tests; none skipped** |
+| Dependency audit | PASS — `npm audit --omit=dev`, zero reported vulnerabilities |
+| Dedicated migration / seed | PASS — all three migrations, plans/categories and QR entitlement |
+| Ownership isolation | PASS — foreign item, document, activity, warranty/repair IDs and attachment IDs rejected |
+| Record validation | PASS — invalid dates, unsupported uploads, invalid Maps hosts/coordinates and identifier expiry/replay rejected |
+| Admin authorization | PASS — separate sessions, CSRF, OWNER restrictions, main-owner protection, role/status/session revocation and audit |
+| Recovery | PASS — normal/admin ticket separation, short-password rejection, atomic single-use consumption and session revocation |
+| Interactive CLI | PASS — real pseudo-terminal on dedicated DB; no input echo; policy, password hash, audit and session/reset-ticket revocation verified |
 
-## Root Cause: spawn ps ENOENT
+Tests used explicitly isolated PostgreSQL/Redis services with `RUN_DB_TESTS=true`; they were never run against the production database. The provider and SMTP boundaries in the authentication suite are simulated, while database sessions, Redis state, JWT verification and authorization checks are real. Google/Discord administrator linking was tested with a different normal-user session present.
 
-The old `npm start` ran `concurrently@9.2.4 → tree-kill@1.2.2`; `tree-kill/index.js:45` invokes `ps -o pid --no-headers --ppid <pid>` without a child error listener. Production does not need this descendant discovery. The v0.1.1 direct Node supervisor fix is now deployed, with `error`/`exit`/`close` handling and bounded shutdown.
+For a repeat dedicated run, set `DATABASE_URL` and `REDIS_URL` to disposable test services, use test security settings, clear `ADMIN_PASSWORD`, unset `DOTENV_CONFIG_OVERRIDE`, and run `RUN_DB_TESTS=true npm test`. Do not allow local production `.env` values to override those dedicated settings.
 
-The retiring v0.1.0 process reproduced `spawn ps ENOENT` during its final shutdown. After the new supervisor started, both deployed SIGTERM and SIGINT exited 0 and restarted cleanly without this error. **RESOLVED in the deployed release.**
+### Isolated browser evidence
 
-## Root Cause: SECURITY_UNAVAILABLE / startup timeouts
+A real Chromium browser exercised the built application against isolated web/API servers in the existing Node 25 container image:
 
-The existing safe error originates in the Redis rate limiter before OAuth state creation. The previous pass confirmed that this Redis endpoint rejects the legacy no-SNI connection and accepts explicit hostname SNI with certificate verification. That parser/queue correction is deployed.
+- User login and item creation with an image document and searched/manual location.
+- Tab navigation; document listing; warranty add/edit; repair add; persisted item activity; global locations/documents.
+- Generated label previews and real QR/Code 128 image decoding and manual resolution.
+- No camera request on load; generated camera-stream frames decoded through the real reader; tracks stopped after resolution; actual denied-camera fallback rendered. Physical camera hardware was not tested.
+- Administrator login/one-use web gate, overview, secondary creation, primary-owner profile, user disable/enable, audit rendering, logout and subsequent gate rejection.
+- Public pages on desktop/mobile; no horizontal overflow or uncaught page errors.
 
-This deployment initially encountered external Redis/PostgreSQL handshake timeouts. Timing probes reproduced connections exceeding the previous five-second defaults. Redis connection/shared readiness now has a 15-second bound, worker readiness a 30-second bound, and PostgreSQL receives a 15-second default connection timeout only when the operator has not configured one. Endpoint, decoded credentials, database selection and TLS settings are preserved. No TLS verification is disabled.
+Browser production-named URLs were transported to isolated servers. Redirect navigation was explicitly re-entered because Playwright interception does not re-route fulfilled HTTP redirect chains; raw server redirects were independently verified. This evidence is not represented as production-domain authenticated verification.
 
-After these changes, public provider discovery returns 200, both OAuth initializers redirect to their actual providers, and CSRF returns the correct unauthenticated 401 instead of 503. **SECURITY_UNAVAILABLE is RESOLVED for the observed production initialization path.**
+Diagnostics reproduced intermittent geometric QR detection failures on clean generated labels. The scanner now tries exact-module decoding after normal detection; 100 randomized generated QR samples passed that fallback. QR output also uses the standard four-module quiet zone. Camera cancellation/unmount cleanup and hidden CLI prompt ordering were corrected during verification.
 
-## PostgreSQL
+## Production deployment and checks
 
-- The owner explicitly confirmed database `Ovoltwst`, schema `public`, on the configured Aiven host as the intended target before writes.
-- Before modification: no application tables or Prisma registry existed; connection/TLS were operational.
-- Reviewed/applied existing migrations: `20261004104353_init`, `20261004133243_local_storage_provider`.
-- Migration status: up to date. No reset, dropped tables, destructive push or major Prisma upgrade.
-- Required plans/categories/entitlements were provisioned through the existing seed and verified by counts.
-- Optional admin seed failed the existing password policy. No account was created or elevated; the owner chose to leave the credential-dependent checks blocked.
-- Live TLS was observed using `pg_stat_ssl`. Prisma Plan/User/Warranty/MigrationJob queries pass from the deployed container.
-- Successful authenticated session writes/persistence are BLOCKED; they are not inferred from successful database connectivity.
+- Existing container: `8bf2b40d-ec37-47a4-a7ee-cf79077221c6`, existing user `998:998`, Node `v25.9.0`.
+- Existing endpoints: `https://ovelo.lightsout.in`, `https://apiovelo.lightsout.in`; existing listeners `0.0.0.0:6968` and `0.0.0.0:6971`.
+- Applied reviewed additive migration `20261005130000_functional_completion` to the owner-confirmed Aiven database. All three migrations are registered as finished.
+- Seeded existing system plans/categories and QR entitlement with administrator bootstrap omitted because its configured password fails policy. No sample production account or inventory was created.
+- Production had **1 user and 1 item** before this update and the same counts afterward. No configured administrator/primary owner exists.
+- Existing ignored environment transferred securely to its deployment location; existing networking/startup workflow retained. Install, explicit Prisma generation and production build passed in the container. Install-script policy warnings were retained without blanket approval.
+- Container restart: PASS — v0.2.0 API health 200, web/API listeners and worker started, port bindings unchanged, no new `ps`/ChildProcess shutdown failure, no configured secret found in inspected startup logs.
 
-## Redis
+| Real production check | Observed result |
+| --- | --- |
+| Login/signup layouts and release metadata | PASS — desktop 1440×1000 and mobile 390×844; Google/Discord/email-password visible; correct HTTPS API destination |
+| Public help/Terms/Privacy and admin login/recovery layouts | PASS — both viewports, no overflow or uncaught page errors |
+| Administrator HTML protection | PASS — 9 direct routes redirect to `/admin/login` before protected content |
+| Administrator API protection | PASS — 10 unauthenticated endpoints return 401 |
+| Lazy administrator bundle / gate | PASS — bundle redirects to login; unsigned gate request rejected |
+| Google authorization initialization | PASS — provider page reached; production callback, expiring Redis state, secure HttpOnly cookie, PKCE and nonce validated |
+| Discord authorization initialization | PASS — provider page reached; production callback, identify scope, expiring Redis state and secure HttpOnly cookie validated |
+| OAuth negative security | PASS — actual invalid provider-code exchanges, bad state, consumed/replayed state, controlled expiry of probe-owned transactions, no session issued |
+| Request protection | PASS — credentialed origin, foreign-origin mutation rejection, unauthenticated API/CSRF rejection, invalid login, rate limit and Retry-After |
+| Successful Google/Discord consent | **BLOCKED — authorized browser/account unavailable** |
+| Authenticated production records/scanning/admin/logout | **BLOCKED — actual authenticated account unavailable** |
+| Primary administrator provisioning | **FAIL — `ADMIN_PASSWORD` does not satisfy existing 16–128-character policy** |
+| SMTP connection/authentication | **FAIL — configured server reached, authentication rejected with `EAUTH` on `AUTH PLAIN`** |
+| SMTP recovery delivery / inbox receipt | BLOCKED — SMTP authentication failed |
+| PDF success | BLOCKED — `CLAMAV_HOST` absent; scanning remains fail-closed |
+| Optional Places API | NOT CONFIGURED — `GOOGLE_MAPS_API_KEY` absent; manual address search/selection and Maps links remain available |
 
-- Configured hostname: `musai-west-mound.ovh2.cloud.layerbase.dev`; port 6379; database 0.
-- URL recognition, decoded authentication, selected database, verified TLS and hostname SNI: PASS.
-- Authentication / PING / SET / GET / DEL / EVAL: PASS using short-lived diagnostic keys.
-- API request limiter and actual OAuth transaction storage/consumption: PASS.
-- BullMQ queue/worker readiness and diagnostic queue operation: PASS; explicit remote host, no localhost fallback.
-- Concurrent readiness callers share the same bounded promise. A real diagnostic connection reconnect passed from the deployed container.
-- Database-backed sessions do not use Redis as their primary store; OAuth/security/pending state uses Redis.
-- Any private CA must be supplied through `NODE_EXTRA_CA_CERTS`; verification remains enabled.
+Local verification discovered inherited shell variables taking precedence over `.env`. Real production probes were repeated with `DOTENV_CONFIG_OVERRIDE=true` so the supplied file was authoritative; dedicated tests explicitly kept that override unset. Credential values were never included in reports or tool output.
 
-## Real browser / OAuth verification
+## Operator follow-up
 
-Chromium opened `https://ovelo.lightsout.in/login` and `/register` at desktop 1440×1000 and mobile 390×844. Both pages show enabled Google and Discord controls plus email/password fields, with no horizontal overflow. HTML release metadata reports v0.1.2. Browser API requests use the exact HTTPS production API prefix; no doubled prefix or local API destination was observed. Browser tests used no request routing, service mocks, fake provider credentials or simulated authorization success.
+1. Provision the primary owner using a policy-compliant `ADMIN_PASSWORD`, or run **`npm run resetpass`** interactively in the existing production container with the correct `ADMIN_EMAIL`. The command prompts without echo, writes the database, revokes sessions/tickets, and does not modify `.env`.
+2. Correct `SMTP_USER` / `SMTP_PASSWORD` and the provider's SMTP authentication requirements, then repeat connection/authentication and an actual recovery-email/inbox test. Do not paste credentials into reports or chat.
+3. Configure a reachable ClamAV service using `CLAMAV_HOST` / `CLAMAV_PORT` for PDF uploads. Keep fail-closed scanning.
+4. Use an authorized real browser/account to complete both OAuth consent flows and exercise authenticated production item/admin/recovery/session/logout workflows. Link administrator provider identities explicitly after administrator password login.
+5. `GOOGLE_MAPS_API_KEY` is optional for Places suggestions. Manual addresses and Maps links do not require it.
 
-For **each provider**, the real button was clicked, the authorization redirect reached the provider's actual page, and the emitted callback matched the configured production callback. No provider configuration error was detected at initialization. This establishes initialization only, not successful consent or credential validity for a successful authorization-code exchange.
+If the primary-owner email is changed, verify the new address before it takes effect. Verification revokes sessions; reconcile `ADMIN_EMAIL` with the verified identity before restarting. Restart bootstrap preserves the existing database password.
 
-The real emitted state was verified in production Redis: random/browser-cookie binding, bounded ten-minute TTL, secure HttpOnly SameSite=Lax cookie. Google nonce and S256 PKCE matched the server-side transaction. Discord retained `identify`; no additional permission was requested.
+## Publication
 
-Actual callback tests used deliberately invalid state/code against production endpoints and real provider token exchange. Invalid state, invalid code, consumed/replayed state and expired state all failed closed and issued no session. Expiry was accelerated only for the probe's own emitted transaction; the application TTL was unchanged. Probe state keys were cleaned up.
-
-- **Google OAuth: BLOCKED — authorized browser/account unavailable.** No successful consent/callback/identity/account/session/dashboard flow, repeat login or logout was claimed.
-- **Discord OAuth: BLOCKED — authorized browser/account unavailable.** No successful consent/callback/account creation/link/session/dashboard flow or logout was claimed.
-
-## CSRF / request protection / sessions
-
-Real frontend `GET /api/v1/auth/csrf` with credentials returns 401 `UNAUTHENTICATED` and no token when no authenticated session exists. CORS returns the configured production origin with credentials; a foreign origin is not granted access, and a foreign-origin login mutation is rejected with 403. Safe capabilities expose provider booleans only. An unauthenticated inventory request returns 401.
-
-Eleven real invalid email-login requests from this runner exercised the Redis limiter: invalid attempts returned 401 and the limit returned 429 with Retry-After. No test user was created. These IP/account limiter entries retain their normal application expiration.
-
-The deployed children were inspected without printing environment values; all required runtime/cookie/proxy flags match production requirements. Secure OAuth cookies were observed. Secure authenticated session cookies, valid/missing/invalid authenticated CSRF, session persistence, expiry/revocation and post-logout cookie reuse are **BLOCKED** without an actual account. Code protections remain enabled, but this pass does not claim those unexecuted live tests passed.
-
-## Startup / deployment / outage
-
-- The existing container and allocation routing were used. No Nginx/DNS/domain/proxy/Pterodactyl networking change.
-- Actual web/API listeners: `0.0.0.0:6968`, `0.0.0.0:6971`; worker has no public HTTP listener.
-- Web/API/worker startup and readiness passed on the retained Node 25.9.0 runtime.
-- Actual deployed supervisor SIGTERM and SIGINT each exited 0; each restart brought back all three services and public API health.
-- A separate read-only diagnostic container used the real deployment `.env` and URLs under a network outage. The deployed API entrypoint exited nonzero at security Redis readiness and never opened the API listener. The production container's networking was untouched. No fake Redis URL or mocked service was used.
-- A startup-log check found no configured credential values. Initial transient timeouts were safely classified; the recovered deployment remained operational.
-- Build commands now load the existing environment before subprocesses, avoiding the runtime-mode warning from the existing install/start workflow.
-- Node 22 LTS remains recommended; no runtime change was forced.
-
-## Health / build / dependency checks
-
-- Web: `https://ovelo.lightsout.in` — 200, v0.1.2 browser metadata.
-- API: `https://apiovelo.lightsout.in/health` — 200, safe status/service/version/name/date only. No credentials, state values, filesystem paths or stack trace in health.
-- Build: PASS locally and in the production container.
-- Typecheck / lint: PASS.
-- `npm test`: 5 startup/release tests plus 12 API unit tests passed; 19 integration tests skipped. The destructive/create-delete integration suite was not enabled against production, and simulated provider tests are not counted as live verification.
-- Installed dependency versions were retained. Install-script policy warnings remain for Prisma, Argon2, esbuild, msgpackr-extract and the lint resolver; generated/native/build artifacts worked in this deployment. Production install audit reported zero vulnerabilities.
-- The local build emitted a bundle-size warning; the deployed artifact built below that threshold. This is a performance follow-up, not an authentication result.
-- Existing deprecations (BullMQ's cron-parser 4, PDFKit's jpeg-exif/crypto-js, ESLint 9) remain documented in [production diagnostics](production-diagnostics.md); no blanket/major dependency upgrade was applied.
-
-## Environment changes required
-
-No Redis, PostgreSQL, OAuth or session credential was changed. Only the required non-secret `NODE_ENV`, `COOKIE_SECURE` and `TRUST_PROXY` flags were corrected in the ignored local environment and transferred securely to the existing deployment environment.
-
-Remaining credential configuration: **`ADMIN_PASSWORD`**, **`SMTP_PASSWORD`**. Values must be provisioned securely; none is provided in this report. An authorized Google/Discord browser/account is also required to complete consent and real session/logout verification.
-
-## Files changed in this pass
-
-```text
-CHANGELOG.js
-CHANGELOG.md
-apps/api/src/config/redis.ts
-apps/api/src/database/prisma.ts
-apps/api/tests/database-config.test.ts
-apps/api/tests/redis.test.ts
-apps/worker/src/database.ts
-apps/worker/src/index.ts
-docs/production-verification-v0.1.1.md
-docs/production-verification.md
-docs/production-diagnostics.md
-package-lock.json
-package.json
-packages/shared/package.json
-packages/shared/src/database.ts
-packages/shared/src/redis.ts
-scripts/build.mjs
-scripts/verify-connections.mjs
-```
-
-The ignored local `.env` was corrected separately and is excluded from this source/release file list. Temporary diagnostic scripts/evidence remain outside the repository. The prior v0.1.1 report is archived without changing its historical verdict; prior changelog entries are preserved.
-
-## Git / secret safety
-
-At the start, `git status --short` showed no `.env`; `git check-ignore -v .env` matched `.gitignore:3`; `git ls-files .env` returned no tracked file. The local environment was retained and never printed. Deployment used a permission-restricted environment file outside Git.
-
-- Staged review: 18 intended source/test/metadata/documentation files; `.env` excluded.
-- Configured secret-value matching, credential-bearing URL and private-key/provider-token signature checks: PASS, no findings. The deployed frontend and recent startup logs were checked in memory; no secret values were printed.
-- `.env`: ignored, not tracked, not staged. No environment file is included in the release.
-- Deployed release commit: **`6219d08203c8c2979ca8cecd31b0730924c6384d`** — `fix: deploy production auth stabilization and verify live services`.
-- Push status: **PUSHED to `origin/main`**; the remote branch hash was verified after pushing. Deployed changed sources were compared with the release files and matched.
-- `.env` was **NOT committed or pushed**. It remains present locally, ignored and untracked. The commit contains only the 18 intended source/test/release/documentation files.
-- This documentation-only publication finalization records the already-created release hash and push result; it does not change the version or verdict. The release commit is reproducibly identified with `git log -1 --format=%H -- CHANGELOG.js`; report publication with `git log -1 --format=%H -- docs/production-verification.md`.
-
-## Final verdict
-
-**FAILED — full authentication verification incomplete.** Deployed version: **0.1.2**. Production deployment/PostgreSQL/Redis/request protection/startup/web health/API health/Git secret check: PASS. `SECURITY_UNAVAILABLE` and `spawn ps ENOENT`: RESOLVED in observed deployed paths. Google OAuth and Discord OAuth: **BLOCKED — authorized browser/account unavailable**. Authenticated CSRF/session/logout/revocation: BLOCKED. Remaining credential configuration: `ADMIN_PASSWORD`, `SMTP_PASSWORD`. Release commit: **`6219d08203c8c2979ca8cecd31b0730924c6384d`**, pushed. `.env` was **NOT committed or pushed**. This saved verdict exactly matches the final chat verdict.
+- Secret checks: **PASS** — 75 intended staged files, actual configured-credential matching, secret signatures/credential-bearing external URLs, deployed frontend and inspected startup logs. Working-tree/all-local-history heuristic scan found no candidates.
+- `.env` is ignored by `.gitignore:3` and untracked; it is excluded from the index. No credentials, provider payloads, tokens, screenshots or raw logs are published.
+- Source publication is being finalized. The release commit identifier will be recorded after Git confirms publication.

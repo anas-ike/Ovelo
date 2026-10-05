@@ -8,6 +8,7 @@ import { env } from '../config/env.js';
 import { destroyAllSessions } from './session.service.js';
 import type { Response } from 'express';
 import type { PendingIdentity } from './oauth-pending.service.js';
+import { adminPassword } from '@ovelo/validation';
 
 const hashPassword = (password: string) =>
   argon2.hash(password, { type: argon2.argon2id, memoryCost: 65536, timeCost: 3, parallelism: 1 });
@@ -112,12 +113,12 @@ export async function authenticate(email: string, password: string) {
   await prisma.securityEvent.create({ data: { userId: user.id, type: 'LOGIN_SUCCESS' } });
   return user;
 }
-export async function requestPasswordReset(email: string) {
+export async function requestPasswordReset(email: string, admin = false) {
   const user = await prisma.user.findUnique({
     where: { email },
-    select: { id: true, email: true },
+    select: { id: true, email: true, role: true },
   });
-  if (!user) return;
+  if (!user || admin !== ['ADMIN', 'OWNER'].includes(user.role)) return;
   const token = randomToken();
   await prisma.passwordReset.deleteMany({ where: { userId: user.id } });
   await prisma.passwordReset.create({
@@ -125,29 +126,36 @@ export async function requestPasswordReset(email: string) {
       userId: user.id,
       tokenHash: hashToken(token),
       expiresAt: new Date(Date.now() + 1000 * 60 * 60),
+      admin,
     },
   });
-  await sendPasswordResetEmail(user.email, token);
+  await sendPasswordResetEmail(user.email, token, admin);
   await prisma.securityEvent.create({
     data: { userId: user.id, type: 'PASSWORD_RESET_REQUESTED' },
   });
+  if (admin) await prisma.adminAuditLog.create({ data: { adminId: user.id, action: 'ADMIN_PASSWORD_RESET_REQUESTED', targetType: 'User', targetId: user.id } });
 }
-export async function resetPassword(token: string, password: string) {
+export async function resetPassword(token: string, password: string, admin = false) {
   const reset = await prisma.passwordReset.findUnique({
     where: { tokenHash: hashToken(token) },
-    select: { id: true, userId: true, expiresAt: true },
+    select: { id: true, userId: true, expiresAt: true, admin: true },
   });
-  if (!reset || reset.expiresAt < new Date())
+  if (!reset || reset.expiresAt < new Date() || reset.admin !== admin)
     throw new AppError(400, 'RESET_INVALID', 'This reset link is invalid or expired.');
-  await prisma.$transaction([
-    prisma.user.update({
+  const identity = await prisma.user.findFirst({ where: { id: reset.userId, deletedAt: null }, select: { role: true } });
+  if (!identity || admin !== ['ADMIN', 'OWNER'].includes(identity.role)) throw new AppError(400, 'RESET_INVALID', 'This reset link is invalid or expired.');
+  if (admin) adminPassword.parse(password);
+  await prisma.$transaction(async tx => {
+    const consumed = await tx.passwordReset.deleteMany({ where: { id: reset.id, expiresAt: { gt: new Date() }, admin } });
+    if (consumed.count !== 1) throw new AppError(400, 'RESET_INVALID', 'This reset link is invalid or expired.');
+    await tx.user.update({
       where: { id: reset.userId },
       data: { passwordHash: await hashPassword(password) },
-    }),
-    prisma.passwordReset.delete({ where: { id: reset.id } }),
-    prisma.session.deleteMany({ where: { userId: reset.userId } }),
-    prisma.securityEvent.create({ data: { userId: reset.userId, type: 'PASSWORD_RESET' } }),
-  ]);
+    });
+    await tx.session.deleteMany({ where: { userId: reset.userId } });
+    await tx.securityEvent.create({ data: { userId: reset.userId, type: 'PASSWORD_RESET' } });
+    if (admin) await tx.adminAuditLog.create({ data: { adminId: reset.userId, action: 'ADMIN_PASSWORD_RESET', targetType: 'User', targetId: reset.userId } });
+  });
 }
 export async function changePassword(
   userId: string,
@@ -157,15 +165,17 @@ export async function changePassword(
 ) {
   const user = await prisma.user.findUniqueOrThrow({
     where: { id: userId },
-    select: { passwordHash: true },
+    select: { passwordHash: true, role: true },
   });
   if (!user.passwordHash || !(await argon2.verify(user.passwordHash, oldPassword)))
     throw new AppError(400, 'PASSWORD_INVALID', 'Current password is incorrect.');
+  if (user.role !== 'USER') adminPassword.parse(newPassword);
   await prisma.user.update({
     where: { id: userId },
     data: { passwordHash: await hashPassword(newPassword) },
   });
   await prisma.securityEvent.create({ data: { userId, type: 'PASSWORD_CHANGED' } });
+  if (user.role !== 'USER') await prisma.adminAuditLog.create({ data: { adminId: userId, action: 'ADMIN_PASSWORD_CHANGED', targetType: 'User', targetId: userId } });
   await destroyAllSessions(userId, response);
 }
 export async function requestEmailChange(userId: string, newEmail: string) {

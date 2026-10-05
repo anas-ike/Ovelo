@@ -1,7 +1,7 @@
 export const apiBase = (import.meta.env.VITE_API_URL || '/api/v1').replace(/\/+$/, '');
 type ApiOptions = RequestInit & { json?: unknown };
-async function csrfToken() {
-  const response = await fetch(`${apiBase}/auth/csrf`, { credentials: 'include', cache: 'no-store' });
+async function csrfToken(admin = false) {
+  const response = await fetch(`${apiBase}/${admin ? 'admin' : 'auth'}/csrf`, { credentials: 'include', cache: 'no-store' });
   if (response.status === 401) return undefined; // Public registration/login do not yet have a session.
   if (!response.ok) throw new Error('Unable to verify request protection. Please sign in again.');
   const result = await response.json() as { data: { csrfToken: string } };
@@ -14,7 +14,7 @@ export async function api<T>(path: string, options: ApiOptions = {}): Promise<T>
     options.body = JSON.stringify(options.json);
   }
   if (options.method && !['GET', 'HEAD', 'OPTIONS'].includes(options.method.toUpperCase())) {
-    const token = await csrfToken();
+    const token = await csrfToken(path.startsWith('/admin/'));
     if (token) headers.set('x-csrf-token', token);
   }
   const response = await fetch(`${apiBase}${path}`, {
@@ -38,3 +38,16 @@ export const patch = <T>(path: string, json?: unknown) => api<T>(path, { method:
 export const del = <T>(path: string) => api<T>(path, { method: 'DELETE' });
 export const upload = <T>(path: string, form: FormData) =>
   api<T>(path, { method: 'POST', body: form });
+export async function fileBlob(path: string) {
+  const response = await fetch(`${apiBase}${path}`, { credentials: 'include' });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null) as { error?: { message?: string } } | null;
+    throw new Error(body?.error?.message || 'The file is not available.');
+  }
+  return response.blob();
+}
+export async function downloadFile(path: string, filename: string) {
+  const url = URL.createObjectURL(await fileBlob(path));
+  const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}

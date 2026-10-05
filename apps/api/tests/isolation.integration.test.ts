@@ -69,7 +69,7 @@ describe.skipIf(!enabled)('resource isolation', () => {
       .post('/api/v1/auth/login')
       .send({ email: firstEmail, password: 'isolation-test-password-123' });
     const response = await agent.get('/api/v1/admin/overview');
-    expect(response.status).toBe(403);
+    expect(response.status).toBe(401); // A normal user cookie is not an administrator session.
     expect(firstId).toBeTruthy();
   });
 });

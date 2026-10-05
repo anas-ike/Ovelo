@@ -3,6 +3,38 @@
 // CommonJS matches the root package; applications consume this at build/startup.
 module.exports.changelog = [
   {
+    version: '0.2.0',
+    name: 'Ownership Records and Administrator Security',
+    date: '2026-10-05',
+    changes: [
+      'Complete item records, document attachment, warranty/repair CRUD, locations and activity.',
+      'Add opaque QR/barcode generation/download and local browser scanning/fallback.',
+      'Protect administrator HTML/API routes, separate sessions, add owner administration and audited recovery.',
+      'Add public help, Terms and Privacy pages.',
+    ],
+    verification: {
+      build: 'PASS', typecheck: 'PASS', lint: 'PASS',
+      tests: 'PASS — 7 root and 43 API tests; none skipped on dedicated PostgreSQL/Redis',
+      isolatedBrowserWorkflows: 'PASS', interactiveCLIRecovery: 'PASS',
+      productionDeployment: 'PASS', productionMigration: 'PASS', productionContentPreserved: 'PASS',
+      webHealth: 'PASS', apiHealth: 'PASS', workerStartup: 'PASS',
+      productionAdministratorRouteProtection: 'PASS — 9 HTML routes, 10 API endpoints and lazy administrator bundle',
+      publicDesktopMobilePages: 'PASS', requestProtection: 'PASS',
+      googleAuthorizationInitialization: 'PASS', discordAuthorizationInitialization: 'PASS',
+      googleOAuth: 'BLOCKED — authorized browser/account unavailable',
+      discordOAuth: 'BLOCKED — authorized browser/account unavailable',
+      authenticatedProductionWorkflows: 'BLOCKED — actual authenticated account unavailable',
+      administratorProvisioning: 'FAIL — ADMIN_PASSWORD does not satisfy existing policy',
+      smtpAuthentication: 'FAIL — configured SMTP credentials rejected with EAUTH',
+      smtpDelivery: 'BLOCKED — SMTP authentication failed',
+      pdfUploads: 'BLOCKED — CLAMAV_HOST absent; fail-closed behavior preserved',
+      mapsPlacesSearch: 'NOT_CONFIGURED — manual address search and Maps links available',
+      physicalCamera: 'NOT_TESTED — image/manual decoding and generated camera frames passed',
+      gitSecretCheck: 'PASS',
+      verdict: 'PARTIAL — release deployed and isolated workflows verified; full live authentication/features incomplete',
+    },
+  },
+  {
     version: '0.1.2',
     name: 'Production Deployment and Live Authentication Verification',
     date: '2026-10-05',

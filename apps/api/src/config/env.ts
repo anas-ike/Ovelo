@@ -18,6 +18,7 @@ const raw = z.object({
   STORAGE_PROVIDER: z.enum(['local', 'google-drive', 'bunny']).default('local'),
   LOCAL_STORAGE_PATH: z.string().min(1).default('/home/container/storage'),
   GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_MAPS_API_KEY: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   GOOGLE_CALLBACK_URL: z.string().url().optional(),
   DISCORD_CLIENT_ID: z.string().optional(),

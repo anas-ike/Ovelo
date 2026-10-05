@@ -8,6 +8,7 @@ import { storageQueue } from './services/migration.service.js';
 import { redisFailure } from '@ovelo/shared/redis';
 import type { Server } from 'node:http';
 import { release } from '@ovelo/shared/release';
+import { provisionMainAdmin } from './auth/main-admin.service.js';
 
 let server: Server | undefined;
 let stopping = false;
@@ -36,6 +37,10 @@ if (!stopping) {
   try {
     await prisma.$connect();
     await prisma.plan.findUniqueOrThrow({ where: { code: 'FREE' }, select: { id: true } });
+    if (env.ADMIN_PASSWORD) {
+      try { await provisionMainAdmin(); }
+      catch { logger.error({ subsystem: 'admin-bootstrap', code: 'ADMIN_PROVISIONING_REQUIRED' }, 'Main administrator provisioning needs secure configuration; use resetpass or review ADMIN_EMAIL/ADMIN_PASSWORD'); }
+    }
   } catch {
     logger.fatal({ subsystem: 'database' }, 'Database startup check failed; verify connectivity, TLS, migrations and initial plans');
     await shutdown('DATABASE_STARTUP_FAILURE', 1);
