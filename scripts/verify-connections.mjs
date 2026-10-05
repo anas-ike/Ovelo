@@ -8,10 +8,11 @@ import { Redis } from 'ioredis';
 import { Queue, Worker } from 'bullmq';
 import { PrismaClient } from '@prisma/client';
 import { redisOptions, redisFailure } from '../packages/shared/dist/redis.js';
+import { databaseUrl } from '../packages/shared/dist/database.js';
 
 const report = (check, details) => console.info(JSON.stringify({ check, ...details }));
 let failed = false;
-const deadline = setTimeout(() => { report('connections', { result: 'FAIL', code: 'PROBE_TIMEOUT' }); process.exit(1); }, 30000);
+const deadline = setTimeout(() => { report('connections', { result: 'FAIL', code: 'PROBE_TIMEOUT' }); process.exit(1); }, 60000);
 deadline.unref();
 if (!process.env.REDIS_URL) {
   failed = true;
@@ -60,7 +61,7 @@ if (!process.env.DATABASE_URL) {
   failed = true;
   report('postgresql', { result: 'BLOCKED', reason: 'DATABASE_URL absent' });
 } else {
-  const prisma = new PrismaClient({ log: [] });
+  const prisma = new PrismaClient({ log: [], datasourceUrl: databaseUrl(process.env.DATABASE_URL) });
   try {
     await prisma.$connect();
     const ssl = await prisma.$queryRaw`SELECT ssl FROM pg_stat_ssl WHERE pid = pg_backend_pid()`;

@@ -58,7 +58,7 @@ describe.skipIf(process.env.RUN_DB_TESTS !== 'true')('security Redis integration
       const waiting = ensureRedis();
       expect(ensureRedis()).toBe(waiting);
       const rejection = expect(waiting).rejects.toThrow('Redis readiness timeout');
-      await vi.advanceTimersByTimeAsync(5000);
+      await vi.advanceTimersByTimeAsync(15000);
       await rejection;
       expect(redis.listenerCount('error')).toBe(listeners);
       expect(redis.listenerCount('end')).toBe(0);

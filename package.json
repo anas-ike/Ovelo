@@ -1,6 +1,6 @@
 {
   "name": "ovelo",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "description": "Ovelo — Know what you own.",
   "workspaces": [
@@ -16,7 +16,7 @@
     "start:api": "node --import=dotenv/config apps/api/dist/server.js",
     "start:worker": "node --import=dotenv/config apps/worker/dist/index.js",
     "start:web": "node --import=dotenv/config apps/web/server.mjs",
-    "build": "npm run build:shared && npm run build:api && npm run build:worker && npm run build:web",
+    "build": "node --import=dotenv/config scripts/build.mjs",
     "build:shared": "npm run build --workspace=@ovelo/shared && npm run build --workspace=@ovelo/validation",
     "build:api": "npm --workspace @ovelo/api run build",
     "build:worker": "npm --workspace @ovelo/worker run build",

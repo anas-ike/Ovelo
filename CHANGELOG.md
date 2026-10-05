@@ -2,6 +2,32 @@
 
 Every meaningful production pass adds a release here and in [CHANGELOG.js](CHANGELOG.js). The root package version is the application version. See [release workflow](docs/releases.md) and [production verification](docs/production-verification.md). Previous history is retained.
 
+## v0.1.2 — Production Deployment and Live Authentication Verification
+Date: 2026-10-05
+
+### Deployment
+- Production verification uses the supplied ignored local `.env` and existing domains/allocations.
+- Deployed v0.1.2 to the existing Pterodactyl server; web/API/worker and production-domain health are operational.
+- Applied both existing reviewed migrations to the owner-confirmed Aiven database; required plans, entitlements and categories are present.
+
+### Fixed
+- Reproduced slow external handshakes exceeding five-second defaults; Redis connection/readiness is bounded at 15 seconds and worker readiness at 30 seconds.
+- PostgreSQL defaults to a bounded 15-second connection timeout while preserving explicit operator settings, endpoint, credentials and TLS.
+- Production build subprocesses load the same ignored environment as startup.
+
+### Verification
+- Build/typecheck/lint: PASS. Tests: 17 passed, 19 integration tests skipped; integration tests were not run against production and do not count as real OAuth verification.
+- Production PostgreSQL schema/TLS/queries, Redis TLS/SNI/auth/commands/BullMQ/reconnect, real provider initialization and Redis state protections: PASS.
+- Both production Login/Signup pages show Google, Discord and email/password on desktop/mobile; HTTPS API destinations and release metadata: PASS.
+- Live invalid-state/code, replay, controlled own-transaction expiry, origin rejection, unauthenticated API rejection and login rate limit: PASS.
+- Deployed SIGTERM/SIGINT and restart: PASS. Isolated real-configuration network outage: API startup fails closed.
+- CSRF: unauthenticated rejection/CORS verified; authenticated nonce/mutation checks BLOCKED without an actual account.
+- Google OAuth: **BLOCKED — authorized browser/account unavailable**.
+- Discord OAuth: **BLOCKED — authorized browser/account unavailable**.
+- Authenticated session/logout/revocation: BLOCKED; administrator seed fails the existing `ADMIN_PASSWORD` policy. SMTP delivery: BLOCKED by absent `SMTP_PASSWORD`.
+- **Executive verdict: FAILED — full authentication verification incomplete.** Infrastructure and negative security passes do not establish successful user authentication.
+- Git secret check: PASS — staged files, actual configured credential matching, secret signatures, deployed frontend and startup logs. `.env` is ignored and excluded. Publication evidence is recorded in the matching report.
+
 ## v0.1.1 — Production Authentication Stabilization
 Date: 2026-10-05
 

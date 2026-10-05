@@ -6,7 +6,8 @@
   "exports": {
     ".": { "types": "./src/index.ts", "default": "./dist/index.js" },
     "./redis": { "types": "./src/redis.ts", "default": "./dist/redis.js" },
-    "./release": { "types": "./src/release.ts", "default": "./dist/release.js" }
+    "./release": { "types": "./src/release.ts", "default": "./dist/release.js" },
+    "./database": { "types": "./src/database.ts", "default": "./dist/database.js" }
   },
   "scripts": { "build": "tsc -p tsconfig.json", "typecheck": "tsc -p tsconfig.json --noEmit" }
 }

@@ -8,7 +8,7 @@ export function redisOptions(value: string) {
     const port = Number(url.port || 6379);
     if (!['redis:', 'rediss:'].includes(url.protocol) || !url.hostname || !Number.isInteger(db) || db < 0 || !Number.isInteger(port) || port < 1 || port > 65535) throw new Error();
     const host = url.hostname.replace(/^\[|\]$/g, '');
-    return { host, port, db, username: decodeURIComponent(url.username) || undefined, password: decodeURIComponent(url.password) || undefined, connectTimeout: 5000, ...(url.protocol === 'rediss:' ? { tls: { rejectUnauthorized: true, ...(isIP(host) ? {} : { servername: host }) } } : {}) };
+    return { host, port, db, username: decodeURIComponent(url.username) || undefined, password: decodeURIComponent(url.password) || undefined, connectTimeout: 15000, ...(url.protocol === 'rediss:' ? { tls: { rejectUnauthorized: true, ...(isIP(host) ? {} : { servername: host }) } } : {}) };
   } catch { throw new Error('REDIS_URL must be a valid redis:// or rediss:// URL with a numeric database index'); }
 }
 

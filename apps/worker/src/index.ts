@@ -95,7 +95,7 @@ try {
 if (!shuttingDown) try {
   await Promise.race([
     Promise.all(workers.map((worker) => worker.waitUntilReady())),
-    new Promise<never>((_resolve, reject) => { startupTimer = setTimeout(() => reject(new Error('Redis startup timeout')), 10000); }),
+    new Promise<never>((_resolve, reject) => { startupTimer = setTimeout(() => reject(new Error('Redis startup timeout')), 30000); }),
   ]);
   if (!shuttingDown) {
     for (const worker of workers) void worker.run().catch((error: unknown) => {

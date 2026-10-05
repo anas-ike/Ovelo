@@ -3,6 +3,32 @@
 // CommonJS matches the root package; applications consume this at build/startup.
 module.exports.changelog = [
   {
+    version: '0.1.2',
+    name: 'Production Deployment and Live Authentication Verification',
+    date: '2026-10-05',
+    changes: [
+      'Deploy the stabilized release using the configured production environment.',
+      'Initialize the confirmed production database using the existing reviewed migrations and seed.',
+      'Verify real production-domain security, provider initialization and service health.',
+      'Bound external Redis/PostgreSQL handshakes after reproducing five-second startup timeouts.',
+      'Load the existing environment before production build subprocesses.',
+    ],
+    verification: {
+      build: 'PASS', typecheck: 'PASS', lint: 'PASS', tests: 'PASS — 17 passed, 19 integration tests skipped',
+      productionDeployment: 'PASS', productionPostgreSQL: 'PASS', productionRedis: 'PASS',
+      requestProtection: 'PASS', csrf: 'PARTIAL — unauthenticated/CORS checks passed; authenticated account unavailable', startup: 'PASS',
+      googleAuthorizationInitialization: 'PASS', discordAuthorizationInitialization: 'PASS',
+      googleOAuth: 'BLOCKED — authorized browser/account unavailable',
+      discordOAuth: 'BLOCKED — authorized browser/account unavailable',
+      authenticatedSession: 'BLOCKED — actual authenticated account unavailable',
+      logoutSessionRevocation: 'BLOCKED — actual authenticated account unavailable',
+      smtpDelivery: 'BLOCKED — SMTP_PASSWORD absent',
+      administratorProvisioning: 'FAIL — ADMIN_PASSWORD does not satisfy existing policy',
+      webHealth: 'PASS', apiHealth: 'PASS', gitSecretCheck: 'PASS',
+      verdict: 'FAILED — full authentication verification incomplete',
+    },
+  },
+  {
     version: '0.1.1',
     name: 'Production Authentication Stabilization',
     date: '2026-10-05',

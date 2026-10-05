@@ -21,7 +21,7 @@ export function ensureRedis(): Promise<Redis> {
   if (connecting) return connecting;
   connecting = new Promise<Redis>((resolve, reject) => {
     let settled = false;
-    const timer = setTimeout(() => done(new Error('Redis readiness timeout')), 5000);
+    const timer = setTimeout(() => done(new Error('Redis readiness timeout')), queueConnection.connectTimeout);
     const ready = () => done();
     const failed = (error: Error) => {
       const code = redisFailure(error);

@@ -1,5 +1,11 @@
 # Production diagnostics and dependency review
 
+## v0.1.2 live deployment follow-up (2026-10-05)
+
+The owner-confirmed production database now has both reviewed migrations and the required initial plans/categories. The corrected Redis/SNI code is deployed; live provider discovery, Google/Discord authorization initialization and negative state/code/replay/expiry tests pass. The deployed web/API/worker and both signal/restart checks pass. Full OAuth consent/session/logout remains blocked without authorized accounts; administrator provisioning and SMTP require credential follow-up. The current verdict is in [production verification](production-verification.md).
+
+Initial rollout probes reproduced external handshakes exceeding the previous five-second defaults. This release retains verified TLS and explicit endpoints while bounding Redis readiness at 15 seconds, worker startup readiness at 30 seconds, and the default PostgreSQL connection timeout at 15 seconds. Operator-supplied database timeout settings take precedence. Build subprocesses load the existing environment before Vite runs. The incident findings below preserve the earlier v0.1.1 investigation snapshot; their deployed-v0.1.0 failures are historical, not the current live result.
+
 ## Incident findings
 
 - **`spawn ps ENOENT`:** `concurrently@9.2.4 → tree-kill@1.2.2`, `tree-kill/index.js:45`, runs `ps -o pid --no-headers --ppid <pid>` on Linux. Its spawned child has no `error` listener. This is shutdown process-tree handling, not an Ovelo monitoring feature or a Node 25 defect. Production now supervises the three direct Node children and handles spawn errors/exit codes/signals without `ps`. Development still uses concurrently.
