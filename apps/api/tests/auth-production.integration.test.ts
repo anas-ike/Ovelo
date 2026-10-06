@@ -22,6 +22,7 @@ describe.skipIf(process.env.RUN_DB_TESTS !== 'true')('production authentication 
   const email = `auth-${run}@gmail.com`;
   const googleEmail = `google-${run}@gmail.com`;
   const discordEmail = `discord-${run}@gmail.com`;
+  const manualConsentEmail = `manual-consent-${run}@gmail.com`;
   const adminEmail = `oauth-admin-${run}@gmail.com`;
   const password = `test-only-${run}`;
   let discordId = Date.now().toString();
@@ -112,7 +113,7 @@ describe.skipIf(process.env.RUN_DB_TESTS !== 'true')('production authentication 
     // the real limiter repeatedly within their test. Other suites are untouched.
     const { env } = await import('../src/config/env.js');
     const redis = await (await import('../src/config/redis.js')).ensureRedis();
-    for (const target of [email, googleEmail, discordEmail, adminEmail]) {
+    for (const target of [email, googleEmail, discordEmail, manualConsentEmail, adminEmail]) {
       const subject = createHmac('sha256', env.SESSION_SECRET)
         .update(`account:${target}`)
         .digest('hex');
@@ -121,7 +122,7 @@ describe.skipIf(process.env.RUN_DB_TESTS !== 'true')('production authentication 
   });
   afterAll(async () => {
     await prisma.user.deleteMany({
-      where: { email: { in: [email, googleEmail, discordEmail, adminEmail] } },
+      where: { email: { in: [email, googleEmail, discordEmail, manualConsentEmail, adminEmail] } },
     });
     await (await import('../src/services/migration.service.js')).storageQueue.close();
     await (await import('../src/config/redis.js')).closeSecurityRedis();
@@ -209,6 +210,23 @@ describe.skipIf(process.env.RUN_DB_TESTS !== 'true')('production authentication 
         .status,
     ).toBe(204);
     expect((await agent.get('/api/v1/auth/me')).status).toBe(401);
+  });
+  it('uses a purpose-bound consent transaction for an existing password account', async () => {
+    const user = await prisma.user.create({
+      data: { email: manualConsentEmail, name: 'Manual consent user', passwordHash: await argon2.hash(password), emailVerifiedAt: new Date() },
+    });
+    const agent = request.agent(app).set('X-Forwarded-For', '198.51.100.184');
+    const blocked = await agent.post('/api/v1/auth/login').send({ email: manualConsentEmail, password });
+    expect(blocked.status).toBe(428);
+    expect((await agent.get('/api/v1/auth/me')).status).toBe(401);
+    expect((await agent.get('/api/v1/auth/consent/pending')).body).toEqual({ data: { kind: 'login' } });
+    expect((await agent.post('/api/v1/auth/consent').send({ termsVersion: policyVersions.terms, privacyVersion: 'old' })).status).toBe(428);
+    const accepted = await agent.post('/api/v1/auth/consent').send(consent);
+    expect(accepted.status).toBe(200);
+    expect((await agent.get('/api/v1/auth/me')).body.data.user.id).toBe(user.id);
+    expect((await agent.post('/api/v1/auth/consent').send(consent)).status).toBe(403);
+    const csrf = (await agent.get('/api/v1/auth/csrf')).body.data.csrfToken;
+    expect((await agent.post('/api/v1/auth/login').set('X-CSRF-Token', csrf).send({ email: manualConsentEmail, password })).status).toBe(200);
   });
   it('completes Google signup/login with real JWT validation and rejects state replay', async () => {
     const agent = request.agent(app);
@@ -440,7 +458,7 @@ describe.skipIf(process.env.RUN_DB_TESTS !== 'true')('production authentication 
     expect(
       (await agent.get('/api/v1/auth/discord/callback').query({ state, code: 'test-code' })).headers
         .location,
-    ).toBe(`${appOrigin}/register?oauth=consent`);
+    ).toBe(`${appOrigin}/consent?source=oauth`);
     expect((await agent.get('/api/v1/auth/me')).status).toBe(401);
     expect(
       (

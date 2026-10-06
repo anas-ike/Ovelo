@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ShieldCheck } from 'lucide-react';
 import { Field, Input } from '../../components/Field';
@@ -7,6 +7,8 @@ import { Button } from '../../components/Button';
 import { Logo } from '../../components/Logo';
 import { post, get, apiBase } from '../../lib/api';
 export function AdminLogin() {
+  const [params] = useSearchParams();
+  const providerError = params.get('oauthError') ? 'Administrator provider sign-in failed. Use a linked administrator identity or your administrator password.' : '';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -36,6 +38,7 @@ export function AdminLogin() {
         <h1>Administrator sign in</h1>
         <p>Manage Ovelo operations with least-privilege access.</p>
         <form onSubmit={submit}>
+          {providerError && <p className="form-alert" role="alert">{providerError}</p>}
           {error && <div className="form-alert">{error}</div>}
           <Field label="Administrator email">
             <Input

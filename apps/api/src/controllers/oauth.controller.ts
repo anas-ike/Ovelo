@@ -16,7 +16,7 @@ export const providerCapabilities = asyncHandler(async (_req, res) => {
 export const pendingProvider = asyncHandler(async (req, res) => {
   const identity = await pendingIdentity(req.cookies?.[pendingCookie]);
   res.json({
-    data: { provider: identity?.provider ?? null, email: identity?.email, name: identity?.name },
+    data: { provider: identity?.provider ?? null, email: identity?.email, name: identity?.name, kind: identity ? identity.userId ? 'consent' : 'register' : null },
   });
 });
 export const consentProvider = asyncHandler(async (req, res) => {
@@ -94,7 +94,7 @@ async function callback(provider: 'google' | 'discord', req: Request, res: Respo
     res.redirect(
       typeof destination === 'object'
         ? destination.adminUrl
-        : `${env.APP_URL}/${destination === 'register' ? 'register?oauth=complete' : destination === 'consent' ? 'register?oauth=consent' : destination}`,
+        : `${env.APP_URL}/${destination === 'register' ? 'register?oauth=complete' : destination === 'consent' ? 'consent?source=oauth' : destination}`,
     );
   } catch (error) {
     if (!(error instanceof AppError)) {
@@ -107,7 +107,7 @@ async function callback(provider: 'google' | 'discord', req: Request, res: Respo
         },
         'OAuth callback failed',
       );
-      return res.redirect(`${env.APP_URL}/login?oauthError=OAUTH_FAILED`);
+      return res.redirect(`${env.APP_URL}/${res.locals.oauthAdminLogin ? 'admin/login' : 'login'}?oauthError=OAUTH_FAILED`);
     }
     const allowed = [
       'LINK_REQUIRED',
@@ -121,7 +121,7 @@ async function callback(provider: 'google' | 'discord', req: Request, res: Respo
       'OAUTH_EMAIL_MISMATCH',
     ];
     const code = allowed.includes(error.code) ? error.code : 'OAUTH_FAILED';
-    res.redirect(`${env.APP_URL}/login?oauthError=${code}`);
+    res.redirect(`${env.APP_URL}/${res.locals.oauthAdminLogin ? 'admin/login' : 'login'}?oauthError=${code}`);
   }
 }
 export const googleCallback = asyncHandler((req, res) => callback('google', req, res));

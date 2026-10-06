@@ -29,9 +29,13 @@ import {
   deleteAccountController,
   policiesController,
   acceptPoliciesController,
+  pendingConsentController,
+  consentController,
 } from '../controllers/auth.controller.js';
 export const authRouter = Router();
 authRouter.get('/providers', providerCapabilities);
+authRouter.get('/consent/pending', pendingConsentController);
+authRouter.post('/consent', rateLimit('policy-consent', 10), consentController);
 authRouter.get('/policies', policiesController);
 authRouter.post(
   '/policies',

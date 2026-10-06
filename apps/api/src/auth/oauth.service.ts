@@ -9,6 +9,7 @@ import { randomToken, hashToken, safeEquals } from '../utils/crypto.js';
 import { ensureRedis, consumeOnce } from '../config/redis.js';
 import { savePendingIdentity, clearPendingOAuth } from './oauth-pending.service.js';
 import { currentPolicyStatus } from './policy-consent.service.js';
+import { clearPendingPolicyAuthentication, policyPendingCookie } from './policy-pending.service.js';
 import { z } from 'zod';
 import type { Response } from 'express';
 import { adminEntryUrl } from './admin-gate.service.js';
@@ -130,6 +131,7 @@ export async function oauthRedirect(
   if (linkUserId && !linkSessionId)
     throw new AppError(401, 'OAUTH_STATE_INVALID', 'Sign in again before linking an account.');
   await clearPendingOAuth(cookies, response);
+  await clearPendingPolicyAuthentication(cookies?.[policyPendingCookie], response);
   await (
     await ensureRedis()
   ).set(
@@ -165,8 +167,6 @@ export async function completeOAuth(
   response.clearCookie('ovelo_oauth_state', { path: '/' });
   if (!transaction)
     throw new AppError(401, 'OAUTH_STATE_INVALID', 'Sign-in has expired or was already used.');
-  if (!code || code.length > 2048)
-    throw new AppError(401, 'OAUTH_STATE_INVALID', 'Sign-in could not be verified.');
   const flow = JSON.parse(transaction) as {
     provider: Provider;
     verifier: string;
@@ -175,6 +175,9 @@ export async function completeOAuth(
     linkSessionId?: string;
     adminLogin?: boolean;
   };
+  response.locals.oauthAdminLogin = flow.adminLogin === true;
+  if (!code || code.length > 2048)
+    throw new AppError(401, 'OAUTH_STATE_INVALID', 'Sign-in could not be verified.');
   if (flow.provider !== provider)
     throw new AppError(401, 'OAUTH_STATE_INVALID', 'Provider mismatch.');
   const initiatingUserId = flow.adminLogin ? currentAdminId : currentUserId;

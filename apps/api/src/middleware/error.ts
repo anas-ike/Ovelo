@@ -54,6 +54,11 @@ export const errorHandler: ErrorRequestHandler = (error, req, res, next) => {
         requestId,
       },
     });
+  if (error?.name === 'MulterError') {
+    const code = error.code === 'LIMIT_FILE_SIZE' ? 'FILE_TOO_LARGE' : 'UPLOAD_INVALID';
+    const message = error.code === 'LIMIT_FILE_SIZE' ? 'This file exceeds the upload limit.' : 'The upload could not be processed.';
+    return res.status(error.code === 'LIMIT_FILE_SIZE' ? 413 : 400).json({ error: { code, message, requestId } });
+  }
   if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002')
     return res
       .status(409)

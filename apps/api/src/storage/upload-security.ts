@@ -1,4 +1,5 @@
 import sharp from 'sharp';
+import { PDFArray, PDFDict, PDFDocument, PDFName, type PDFObject } from 'pdf-lib';
 import { env } from '../config/env.js';
 import { AppError } from '../middleware/error.js';
 import { checksum } from './storage-manager.js';
@@ -40,12 +41,38 @@ export async function validateUpload(file: { buffer: Buffer; originalname: strin
   if (pdf) {
     // PDFs remain attachments and require a live malware scanner. Fail closed if absent.
     if (
-      !b.subarray(-1024).includes(Buffer.from('%%EOF')) ||
-      /\/(JavaScript|JS|Launch|EmbeddedFile|OpenAction|AA|RichMedia|XFA)\b/.test(
-        b.toString('latin1'),
-      )
+      !b.subarray(-1024).includes(Buffer.from('%%EOF'))
     )
-      throw new AppError(415, 'PDF_UNSAFE', 'Active or malformed PDFs are not accepted.');
+      throw new AppError(415, 'PDF_INVALID', 'This PDF could not be validated.');
+    try {
+      const document = await PDFDocument.load(b, { throwOnInvalidObject: true, updateMetadata: false });
+      if (document.getPageCount() < 1) throw new Error('empty PDF');
+      const blocked = new Set(['JavaScript', 'JS', 'Launch', 'EmbeddedFile', 'OpenAction', 'AA', 'RichMedia', 'XFA']);
+      const visited = new Set<PDFObject>();
+      const inspect = (object: PDFObject) => {
+        const resolved = document.context.lookup(object);
+        if (!resolved || visited.has(resolved)) return;
+        visited.add(resolved);
+        if (resolved instanceof PDFName) {
+          if (blocked.has(resolved.decodeText()))
+            throw new AppError(415, 'PDF_UNSAFE', 'This PDF contains active or embedded content that is not supported.');
+          return;
+        }
+        if (resolved instanceof PDFDict) {
+          for (const [key, value] of resolved.entries()) {
+            if (blocked.has(key.decodeText()))
+              throw new AppError(415, 'PDF_UNSAFE', 'This PDF contains active or embedded content that is not supported.');
+            inspect(value);
+          }
+        } else if (resolved instanceof PDFArray) {
+          for (const value of resolved.asArray()) inspect(value);
+        }
+      };
+      for (const [, object] of document.context.enumerateIndirectObjects()) inspect(object);
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      throw new AppError(415, 'PDF_INVALID', 'This PDF could not be validated.');
+    }
     await scanFile(b);
     body = b;
     mimeType = 'application/pdf';
@@ -58,7 +85,7 @@ export async function validateUpload(file: { buffer: Buffer; originalname: strin
         .toBuffer();
       mimeType = 'image/webp';
     } catch {
-      throw new AppError(415, 'IMAGE_INVALID', 'The image could not be safely decoded.');
+      throw new AppError(415, 'IMAGE_INVALID', 'This image could not be validated.');
     }
   }
   if (body.length > env.MAX_UPLOAD_SIZE)

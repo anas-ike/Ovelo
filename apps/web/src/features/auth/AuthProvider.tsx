@@ -35,7 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const identity = useRef<string | null>(null);
   const mutating = useRef(false);
   const channel = useRef<BroadcastChannel | null>(null);
-  const publicPage = ['/', '/how-it-works', '/terms', '/privacy'].includes(location.pathname);
+  const publicPage = ['/', '/how-it-works', '/terms', '/privacy', '/consent'].includes(location.pathname);
   const refresh = useCallback(async () => {
     if (mutating.current) return;
     const current = ++request.current;

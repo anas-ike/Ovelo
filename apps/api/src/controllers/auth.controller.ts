@@ -38,6 +38,12 @@ import {
   currentPolicyStatus,
   requireCurrentPolicyConsent,
 } from '../auth/policy-consent.service.js';
+import {
+  clearPendingPolicyAuthentication,
+  pendingPolicyAuthentication,
+  policyPendingCookie,
+  savePendingPolicyAuthentication,
+} from '../auth/policy-pending.service.js';
 export const registerController = asyncHandler(async (req, res) => {
   const body = registerSchema.parse(req.body);
   assertPolicyVersions(body, ['TERMS', 'PRIVACY']);
@@ -56,8 +62,18 @@ export const registerController = asyncHandler(async (req, res) => {
 export const loginController = asyncHandler(async (req, res) => {
   const body = loginSchema.parse(req.body);
   const user = await authenticate(body.email, body.password);
-  await requireLoginPolicyConsent(user.id, body);
+  try {
+    await requireLoginPolicyConsent(user.id, body);
+  } catch (error) {
+    if (!(error instanceof AppError) || error.code !== 'POLICY_CONSENT_REQUIRED') throw error;
+    await savePendingPolicyAuthentication(
+      { userId: user.id, replaceSessionId: req.auth?.sessionId },
+      res,
+    );
+    throw error;
+  }
   await clearPendingOAuth(req.cookies, res);
+  await clearPendingPolicyAuthentication(req.cookies?.[policyPendingCookie], res);
   await createSession(user.id, res, {
     userAgent: req.get('user-agent'),
     replaceSessionId: req.auth?.sessionId,
@@ -74,8 +90,37 @@ export const loginController = asyncHandler(async (req, res) => {
     },
   });
 });
+export const pendingConsentController = asyncHandler(async (req, res) => {
+  const oauth = await pendingIdentity(req.cookies?.[pendingCookie]);
+  if (oauth?.userId) return res.json({ data: { kind: 'oauth', provider: oauth.provider } });
+  const policy = await pendingPolicyAuthentication(req.cookies?.[policyPendingCookie]);
+  res.json({ data: { kind: policy ? 'login' : null } });
+});
+export const consentController = asyncHandler(async (req, res) => {
+  const body = policyConsentSchema
+    .pick({ termsVersion: true, privacyVersion: true })
+    .required()
+    .strict()
+    .parse(req.body);
+  const pending = await pendingPolicyAuthentication(req.cookies?.[policyPendingCookie]);
+  if (!pending) throw new AppError(400, 'POLICY_PENDING_EXPIRED', 'Sign-in expired. Start again.');
+  await requireCurrentPolicyConsent(pending.userId, body, ['TERMS', 'PRIVACY']);
+  const user = await prisma.user.findFirst({
+    where: { id: pending.userId, deletedAt: null, disabledAt: null },
+    select: { id: true, emailVerifiedAt: true },
+  });
+  if (!user || !user.emailVerifiedAt) throw new AppError(403, 'ACCOUNT_UNAVAILABLE', 'This account is unavailable.');
+  await pendingPolicyAuthentication(req.cookies?.[policyPendingCookie], true);
+  await clearPendingPolicyAuthentication(req.cookies?.[policyPendingCookie], res);
+  await createSession(user.id, res, {
+    userAgent: req.get('user-agent'),
+    replaceSessionId: pending.replaceSessionId,
+  });
+  res.json({ data: { authenticated: true } });
+});
 export const logoutController = asyncHandler(async (req, res) => {
   await clearPendingOAuth(req.cookies, res);
+  await clearPendingPolicyAuthentication(req.cookies?.[policyPendingCookie], res);
   if (req.auth) await destroySession(req.auth.sessionId, res);
   else clearSessionCookies(res);
   res.status(204).send();
@@ -151,6 +196,7 @@ export const revokeSessionController = asyncHandler(async (req, res) => {
 });
 export const logoutAllController = asyncHandler(async (req, res) => {
   await clearPendingOAuth(req.cookies, res);
+  await clearPendingPolicyAuthentication(req.cookies?.[policyPendingCookie], res);
   await destroyAllSessions(req.auth!.userId, res);
   res.status(204).send();
 });
@@ -242,6 +288,7 @@ export const deleteAccountController = asyncHandler(async (req, res) => {
     }),
   ]);
   await clearPendingOAuth(req.cookies, res);
+  await clearPendingPolicyAuthentication(req.cookies?.[policyPendingCookie], res);
   clearSessionCookies(res);
   res.status(202).json({ data: { deleted: true } });
 });

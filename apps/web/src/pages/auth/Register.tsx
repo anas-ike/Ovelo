@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { AuthShell } from './AuthShell';
 import { Field, Input } from '../../components/Field';
 import { Button } from '../../components/Button';
@@ -7,20 +7,16 @@ import { get, post } from '../../lib/api';
 import { OAuthButtons } from '../../features/auth/OAuthButtons';
 import { useQuery } from '@tanstack/react-query';
 import { policyVersions } from '@ovelo/validation';
-import { useAuth } from '../../features/auth/AuthProvider';
 export function Register() {
   const navigate = useNavigate();
-  const { refresh } = useAuth();
-  const [params] = useSearchParams();
-  const completing = params.get('oauth') === 'complete';
-  const consenting = params.get('oauth') === 'consent';
   const pending = useQuery({
     queryKey: ['oauth-pending'],
     queryFn: () =>
-      get<{ data: { provider: string | null; email?: string; name?: string } }>(
+      get<{ data: { provider: string | null; email?: string; name?: string; kind: 'register' | 'consent' | null } }>(
         '/auth/oauth/pending',
       ),
-    enabled: completing || consenting,
+    staleTime: 0,
+    refetchOnMount: 'always',
     retry: false,
   });
   const [name, setName] = useState('');
@@ -29,6 +25,7 @@ export function Register() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [consent, setConsent] = useState(false);
+  const completing = pending.data?.data.kind === 'register';
   useEffect(() => {
     if (pending.data?.data.email) setEmail(pending.data.data.email);
     if (pending.data?.data.name) setName(pending.data.data.name);
@@ -42,24 +39,13 @@ export function Register() {
         throw new Error(
           'Accept the Terms of Service and acknowledge the Privacy Policy to continue.',
         );
-      if (consenting)
-        await post('/auth/oauth/consent', {
-          termsVersion: policyVersions.terms,
-          privacyVersion: policyVersions.privacy,
-        });
-      else
-        await post('/auth/register', {
+      await post('/auth/register', {
           name,
           email,
           password,
           termsVersion: policyVersions.terms,
           privacyVersion: policyVersions.privacy,
         });
-      if (consenting) {
-        await refresh();
-        navigate('/dashboard', { replace: true });
-        return;
-      }
       navigate(`/verify-email?email=${encodeURIComponent(email)}`);
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Unable to create your account.');
@@ -67,30 +53,27 @@ export function Register() {
       setLoading(false);
     }
   };
+  if (pending.isPending) return <AuthShell title="Preparing your account" subtitle="Checking your sign-in request…" />;
+  if (pending.data?.data.kind === 'consent') return <Navigate to="/consent?source=oauth" replace />;
+  if (pending.error) return <AuthShell title="Sign-in request expired" subtitle="Start provider sign-in again."><p role="alert" className="form-alert">{pending.error.message}</p><OAuthButtons /></AuthShell>;
   return (
     <AuthShell
-      title={consenting ? 'One last privacy check' : 'Make it yours'}
-      subtitle={
-        consenting
-          ? 'Accept the current policies to finish signing in.'
-          : 'Create a private record of everything you own.'
-      }
+      title="Make it yours"
+      subtitle="Create a private record of everything you own."
     >
-      {(completing || consenting) &&
+      {completing &&
         (pending.error ? (
           <p role="alert" className="form-alert">
             Provider sign-in expired. Start sign-in again.
           </p>
         ) : (
           <p className="auth-subtitle">
-            {consenting
-              ? 'Your existing Ovelo account needs your acknowledgement of the current Terms and Privacy Policy.'
-              : `${pending.data?.data.provider === 'discord' ? 'Discord' : 'Your provider'} verified your identity. Add an approved email and a recovery password below, then verify the email to finish registration.`}
+            {pending.data?.data.email ? 'Your provider verified your email. Choose a recovery password and accept the current policies to finish creating your account.' : 'Discord verified your identity. Add an approved email and a recovery password, then verify the email to finish registration.'}
           </p>
         ))}
       <form className="auth-form" onSubmit={submit}>
         {error && <div className="form-alert">{error}</div>}
-        {!consenting && (
+        {(
           <Field label="Your name">
             <Input
               value={name}
@@ -101,7 +84,7 @@ export function Register() {
             />
           </Field>
         )}
-        {!consenting && (
+        {(
           <Field label="Email">
             <Input
               type="email"
@@ -114,7 +97,7 @@ export function Register() {
             />
           </Field>
         )}
-        {!consenting && (
+        {(
           <Field label="Password" hint="At least 12 characters">
             <Input
               type="password"
@@ -147,13 +130,7 @@ export function Register() {
           </span>
         </label>
         <Button type="submit" loading={loading} className="full-button">
-          {consenting ? (
-            'Accept and continue'
-          ) : (
-            <>
-              Create my Ovelo <span>→</span>
-            </>
-          )}
+          Create my Ovelo <span>→</span>
         </Button>
       </form>
       <OAuthButtons />

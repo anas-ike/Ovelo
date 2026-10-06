@@ -5,7 +5,6 @@ import { Field, Input } from '../../components/Field';
 import { Button } from '../../components/Button';
 import { useAuth } from '../../features/auth/AuthProvider';
 import { OAuthButtons } from '../../features/auth/OAuthButtons';
-import { policyVersions } from '@ovelo/validation';
 export function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -29,22 +28,12 @@ export function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [requiresConsent, setRequiresConsent] = useState(
-    new URLSearchParams(location.search).get('oauthError') === 'POLICY_CONSENT_REQUIRED',
-  );
-  const [consent, setConsent] = useState(false);
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     setError('');
     setLoading(true);
     try {
-      await login(
-        email,
-        password,
-        consent
-          ? { termsVersion: policyVersions.terms, privacyVersion: policyVersions.privacy }
-          : undefined,
-      );
+      await login(email, password);
       const next = new URLSearchParams(location.search).get('next');
       navigate(
         next && next.startsWith('/') && !next.startsWith('//') && !next.includes('\\')
@@ -53,8 +42,11 @@ export function Login() {
         { replace: true },
       );
     } catch (error) {
-      if ((error as Error & { code?: string }).code === 'POLICY_CONSENT_REQUIRED')
-        setRequiresConsent(true);
+      if ((error as Error & { code?: string }).code === 'POLICY_CONSENT_REQUIRED') {
+        const next = new URLSearchParams(location.search).get('next');
+        navigate(`/consent?source=login${next ? `&next=${encodeURIComponent(next)}` : ''}`, { replace: true });
+        return;
+      }
       setError(error instanceof Error ? error.message : 'Unable to sign in.');
     } finally {
       setLoading(false);
@@ -89,27 +81,6 @@ export function Login() {
             placeholder="Your password"
           />
         </Field>
-        {requiresConsent && (
-          <label className="consent-row">
-            <input
-              type="checkbox"
-              checked={consent}
-              onChange={(e) => setConsent(e.target.checked)}
-              required
-            />{' '}
-            <span>
-              I agree to the Ovelo{' '}
-              <Link to="/terms" target="_blank" rel="noopener noreferrer">
-                Terms &amp; Conditions
-              </Link>{' '}
-              and{' '}
-              <Link to="/privacy" target="_blank" rel="noopener noreferrer">
-                Privacy Policy
-              </Link>
-              .
-            </span>
-          </label>
-        )}
         <div className="form-row">
           <Link className="muted-link" to="/forgot-password">
             Forgot password?

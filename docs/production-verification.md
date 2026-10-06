@@ -12,19 +12,21 @@ Date: 2026-10-06
 - The browser previously retained private queries after logout, and in-flight authentication responses could restore stale identity. Response generation checks, query cancellation/clearing, identity-keyed private component remounts, cross-tab signals and focus/expiry checks now enforce the browser boundary. Failed server logout retains a visible error instead of falsely reporting success.
 - Password/OAuth login rotates the replaced same-kind browser session atomically. Normal/admin sessions remain separate. Explicit linking keeps its initiating session. Logout invalidates pending OAuth transactions and clears their host-only cookies.
 - Versioned Terms/Privacy acknowledgements are required before account creation or the next applicable sign-in; provider-only legacy users have a single-use pending consent step. Current upload processing acknowledgement is checked before multipart parsing and storage. Acceptance records contain policy, version and timestamp, with history retained and included in account exports.
+- Manual and existing-account OAuth consent now use a dedicated `/consent` route backed by single-use, purpose-bound Redis tickets. Registration mode is derived from the server-side pending identity rather than a URL query, and administrator OAuth errors remain on the administrator login surface.
+- Upload validation structurally parses PDFs, rejects active/embedded content with a specific error, reports corrupt images/PDFs separately, and preserves fail-closed scanner-unavailable behavior. Valid JPG, PNG, WEBP and structurally valid PDF fixtures pass the focused format boundary tests.
 - Administrator records have bounded server pagination/search, stable ordering, narrow-screen navigation/cards/forms, accessible pagination, and visible modal errors. Missing administrator configuration has a distinct recovery response; individual mismatches and delivery failures still receive the same generic acknowledgement.
 - Unknown public HTML routes return a branded HTTP 404; private HTML and admin redirects have no-store/noindex headers. Existing ownership, CSRF, rate-limit, password and upload-scan safeguards remain in place.
 
 ### Available evidence
 
-- Dedicated disposable PostgreSQL/Redis API tests: **PASS — 51 tests passed, none skipped**, using serial Vitest workers, secure test-only database/cache, migrations and seeded plans.
+- Dedicated disposable PostgreSQL/Redis API tests: **PASS — 66 tests passed, none skipped**, using serial Vitest workers, secure test-only database/cache, migrations and seeded plans.
 - Isolated real Chromium: **10 workflow groups passed**, including delayed `/auth/me` after logout, sign-in/link separation, Google A → logout → Discord B, SPA email identity/query-cache changes, cross-tab logout, unchecked consent and current-version suppression, server pagination, mobile admin create/error recovery, HTTP 404 and no uncaught page errors.
 - Responsive admin audit: **72 checks**, nine sections at 320, 360, 375, 390, 412, 768, 1024 and 1440px; no horizontal overflow, one H1, dialog overflow and Escape handling.
 - Provider token exchanges/browser provider screens and SMTP failures were simulated; database sessions, Redis state, Google JWT verification, private-record checks and the built app were real. Test services were disposable; production records were not used by tests.
-- Root tests: **PASS — 11 tests**. Default API suite: **PASS — 14 passed, 37 intentionally skipped without disposable services**.
+- Root tests: **PASS — 11 tests**. Default API suite: **PASS — 28 passed, 38 intentionally skipped without disposable services**.
 - Build/typecheck/lint: **PASS**. `npm audit --omit=dev`: **0 vulnerabilities**. `git diff --check`: **PASS**. Focused secret scan: **PASS — no candidates**; `.env` is ignored and untracked.
-- Repository-wide format check: **FAIL — 62 pre-existing warnings in unrelated baseline files**; focused release files were formatted and the repository was not mass-reformatted.
-- Production deployment/migration/public probes: **PASS — v0.4.0 API health, web/API/worker startup, unchanged ports, additive consent migration, HTTPS redirects/HSTS, public routes, noindex/private cache boundary, sitemap, robots, favicon, OG image, CORS and real 404**.
+- Repository-wide format check: **FAIL — repository-wide Prettier drift remains (76 files reported); unrelated files were not mass-reformatted.**
+- Production deployment/restart/public probes: **PASS — v0.4.0 fix tree deployed; API health 200, web/API/worker started, unchanged ports, HTTPS redirects/HSTS, `/consent`, public routes, noindex/private cache boundary, sitemap, robots, favicon, OG image, CORS and real 404**.
 - Production public Chromium: **PASS — 28 page/width checks at 320, 390, 768 and 1440px; no overflow, no multiple H1s and no uncaught page errors**.
 - Build output: CSS 42.14 KB; largest emitted JS chunks 416.51 KB and 347.41 KB; OG image 41.5 KB. Public probe response times were 9–218 ms in this environment. LCP/CLS/INP were not measured; Lighthouse is unavailable and no score is claimed.
 

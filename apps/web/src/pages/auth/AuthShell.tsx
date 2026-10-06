@@ -5,7 +5,7 @@ export function AuthShell({
   title,
   subtitle,
 }: {
-  children: React.ReactNode;
+  children?: React.ReactNode;
   title: string;
   subtitle: string;
 }) {

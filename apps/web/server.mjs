@@ -170,6 +170,7 @@ const server = createServer(async (request, response) => {
     [
       '/login',
       '/register',
+      '/consent',
       '/verify-email',
       '/forgot-password',
       '/reset-password',

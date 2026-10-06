@@ -28,6 +28,7 @@ import { logger } from '../utils/logger.js';
 import { storageQueue } from '../services/migration.service.js';
 import { adminEntryUrl, adminGate } from '../auth/admin-gate.service.js';
 import { clearPendingOAuth } from '../auth/oauth-pending.service.js';
+import { clearPendingPolicyAuthentication, policyPendingCookie } from '../auth/policy-pending.service.js';
 export const adminRouter = Router();
 const publicAdmin = {
   id: true,
@@ -185,6 +186,7 @@ adminRouter.post(
   asyncHandler(async (req, res) => {
     await auditAdmin(req, res, 'ADMIN_LOGOUT', 'Session', req.auth!.sessionId);
     await clearPendingOAuth(req.cookies, res);
+    await clearPendingPolicyAuthentication(req.cookies?.[policyPendingCookie], res);
     await destroySession(req.auth!.sessionId, res, true);
     res.status(204).send();
   }),

@@ -5,6 +5,7 @@ import { hashToken, safeEquals } from '../utils/crypto.js';
 import { env } from '../config/env.js';
 import { AppError } from './error.js';
 import { adminSessionCookie, adminCsrfCookie } from '../auth/session.service.js';
+import { currentPolicyStatus } from '../auth/policy-consent.service.js';
 type Authentication = { userId: string; sessionId: string; role: Role; admin: boolean; csrfHash: string; isPrimaryAdmin: boolean };
 declare global { namespace Express { interface Request { auth?: Authentication; adminAuth?: Authentication; } } }
 export const loadSession: RequestHandler = async (req, _res, next) => {
@@ -21,7 +22,18 @@ export const loadSession: RequestHandler = async (req, _res, next) => {
     next();
   } catch (error) { next(error); }
 };
-export const requireAuth: RequestHandler = (req, _res, next) => req.auth ? next() : next(new AppError(401, 'UNAUTHENTICATED', 'Sign in to continue.'));
+export const requireAuth: RequestHandler = async (req, _res, next) => {
+  try {
+    if (!req.auth) return next(new AppError(401, 'UNAUTHENTICATED', 'Sign in to continue.'));
+    const route = `${req.baseUrl}${req.path}`;
+    if (!req.auth.admin && !['/api/v1/auth/csrf', '/api/v1/auth/policies'].includes(route)) {
+      const policies = await currentPolicyStatus(req.auth.userId);
+      if (!policies.accepted.terms || !policies.accepted.privacy)
+        return next(new AppError(428, 'POLICY_CONSENT_REQUIRED', 'Accept the current Ovelo policies to continue.'));
+    }
+    next();
+  } catch (error) { next(error); }
+};
 export const requireAdmin: RequestHandler = (req, _res, next) => req.auth?.admin && ['ADMIN', 'OWNER'].includes(req.auth.role) ? next() : next(new AppError(403, 'FORBIDDEN', 'Administrator access is required.'));
 export const requireOwner: RequestHandler = (req, _res, next) => req.auth?.admin && req.auth.role === 'OWNER' ? next() : next(new AppError(403, 'OWNER_REQUIRED', 'Owner access is required.'));
 export const csrf: RequestHandler = (req, _res, next) => {
