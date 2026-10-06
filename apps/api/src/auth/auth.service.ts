@@ -9,6 +9,7 @@ import { destroyAllSessions } from './session.service.js';
 import type { Response } from 'express';
 import type { PendingIdentity } from './oauth-pending.service.js';
 import { adminPassword } from '@ovelo/validation';
+import { assertPolicyVersions, requireCurrentPolicyConsent } from './policy-consent.service.js';
 
 const hashPassword = (password: string) =>
   argon2.hash(password, { type: argon2.argon2id, memoryCost: 65536, timeCost: 3, parallelism: 1 });
@@ -20,8 +21,24 @@ export const publicUserSelect = {
   emailVerifiedAt: true,
   createdAt: true,
 } as const;
-export async function register(input: { name: string; email: string; password: string }, identity?: PendingIdentity | null) {
+export async function register(
+  input: {
+    name: string;
+    email: string;
+    password: string;
+    termsVersion?: string;
+    privacyVersion?: string;
+  },
+  identity?: PendingIdentity | null,
+) {
+  assertPolicyVersions(input, ['TERMS', 'PRIVACY']);
   await assertEmailAllowed(input.email);
+  if (identity?.email && identity.email !== input.email)
+    throw new AppError(
+      400,
+      'OAUTH_EMAIL_MISMATCH',
+      'Use the email address verified by your provider.',
+    );
   if (await prisma.user.findUnique({ where: { email: input.email }, select: { id: true } }))
     throw new AppError(
       400,
@@ -39,7 +56,16 @@ export async function register(input: { name: string; email: string; password: s
         email: input.email,
         passwordHash: await hashPassword(input.password),
         notificationPreference: { create: {} },
-        ...(identity ? { accounts: { create: identity } } : {}),
+        ...(identity
+          ? {
+              accounts: {
+                create: {
+                  provider: identity.provider,
+                  providerAccountId: identity.providerAccountId,
+                },
+              },
+            }
+          : {}),
       },
       select: publicUserSelect,
     });
@@ -53,6 +79,12 @@ export async function register(input: { name: string; email: string; password: s
         },
       });
     await tx.securityEvent.create({ data: { userId: created.id, type: 'REGISTRATION' } });
+    await tx.policyConsent.createMany({
+      data: [
+        { userId: created.id, policy: 'TERMS', version: input.termsVersion! },
+        { userId: created.id, policy: 'PRIVACY', version: input.privacyVersion! },
+      ],
+    });
     return created;
   });
   if (env.EMAIL_VERIFICATION_REQUIRED || identity) await sendVerificationEmail(user.email, token);
@@ -113,6 +145,12 @@ export async function authenticate(email: string, password: string) {
   await prisma.securityEvent.create({ data: { userId: user.id, type: 'LOGIN_SUCCESS' } });
   return user;
 }
+export async function requireLoginPolicyConsent(
+  userId: string,
+  input: { termsVersion?: string; privacyVersion?: string },
+) {
+  return requireCurrentPolicyConsent(userId, input, ['TERMS', 'PRIVACY']);
+}
 export async function requestPasswordReset(email: string, admin = false) {
   const user = await prisma.user.findUnique({
     where: { email },
@@ -133,7 +171,15 @@ export async function requestPasswordReset(email: string, admin = false) {
   await prisma.securityEvent.create({
     data: { userId: user.id, type: 'PASSWORD_RESET_REQUESTED' },
   });
-  if (admin) await prisma.adminAuditLog.create({ data: { adminId: user.id, action: 'ADMIN_PASSWORD_RESET_REQUESTED', targetType: 'User', targetId: user.id } });
+  if (admin)
+    await prisma.adminAuditLog.create({
+      data: {
+        adminId: user.id,
+        action: 'ADMIN_PASSWORD_RESET_REQUESTED',
+        targetType: 'User',
+        targetId: user.id,
+      },
+    });
 }
 export async function resetPassword(token: string, password: string, admin = false) {
   const reset = await prisma.passwordReset.findUnique({
@@ -142,19 +188,34 @@ export async function resetPassword(token: string, password: string, admin = fal
   });
   if (!reset || reset.expiresAt < new Date() || reset.admin !== admin)
     throw new AppError(400, 'RESET_INVALID', 'This reset link is invalid or expired.');
-  const identity = await prisma.user.findFirst({ where: { id: reset.userId, deletedAt: null }, select: { role: true } });
-  if (!identity || admin !== ['ADMIN', 'OWNER'].includes(identity.role)) throw new AppError(400, 'RESET_INVALID', 'This reset link is invalid or expired.');
+  const identity = await prisma.user.findFirst({
+    where: { id: reset.userId, deletedAt: null },
+    select: { role: true },
+  });
+  if (!identity || admin !== ['ADMIN', 'OWNER'].includes(identity.role))
+    throw new AppError(400, 'RESET_INVALID', 'This reset link is invalid or expired.');
   if (admin) adminPassword.parse(password);
-  await prisma.$transaction(async tx => {
-    const consumed = await tx.passwordReset.deleteMany({ where: { id: reset.id, expiresAt: { gt: new Date() }, admin } });
-    if (consumed.count !== 1) throw new AppError(400, 'RESET_INVALID', 'This reset link is invalid or expired.');
+  await prisma.$transaction(async (tx) => {
+    const consumed = await tx.passwordReset.deleteMany({
+      where: { id: reset.id, expiresAt: { gt: new Date() }, admin },
+    });
+    if (consumed.count !== 1)
+      throw new AppError(400, 'RESET_INVALID', 'This reset link is invalid or expired.');
     await tx.user.update({
       where: { id: reset.userId },
       data: { passwordHash: await hashPassword(password) },
     });
     await tx.session.deleteMany({ where: { userId: reset.userId } });
     await tx.securityEvent.create({ data: { userId: reset.userId, type: 'PASSWORD_RESET' } });
-    if (admin) await tx.adminAuditLog.create({ data: { adminId: reset.userId, action: 'ADMIN_PASSWORD_RESET', targetType: 'User', targetId: reset.userId } });
+    if (admin)
+      await tx.adminAuditLog.create({
+        data: {
+          adminId: reset.userId,
+          action: 'ADMIN_PASSWORD_RESET',
+          targetType: 'User',
+          targetId: reset.userId,
+        },
+      });
   });
 }
 export async function changePassword(
@@ -175,7 +236,15 @@ export async function changePassword(
     data: { passwordHash: await hashPassword(newPassword) },
   });
   await prisma.securityEvent.create({ data: { userId, type: 'PASSWORD_CHANGED' } });
-  if (user.role !== 'USER') await prisma.adminAuditLog.create({ data: { adminId: userId, action: 'ADMIN_PASSWORD_CHANGED', targetType: 'User', targetId: userId } });
+  if (user.role !== 'USER')
+    await prisma.adminAuditLog.create({
+      data: {
+        adminId: userId,
+        action: 'ADMIN_PASSWORD_CHANGED',
+        targetType: 'User',
+        targetId: userId,
+      },
+    });
   await destroyAllSessions(userId, response);
 }
 export async function requestEmailChange(userId: string, newEmail: string) {

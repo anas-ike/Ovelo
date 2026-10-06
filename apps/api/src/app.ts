@@ -41,7 +41,7 @@ app.use(
     origin: env.APP_URL,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'X-CSRF-Token', 'X-Request-ID'],
+    allowedHeaders: ['Content-Type', 'X-CSRF-Token', 'X-Request-ID', 'X-Upload-Processing-Version'],
   }),
 );
 app.use(compression());

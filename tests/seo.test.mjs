@@ -72,3 +72,11 @@ test('private fallback is explicitly non-indexable', () => {
   assert.match(html, /<meta name="googlebot" content="noindex, nofollow">/);
   assert.doesNotMatch(html, /rel="canonical"/);
 });
+test('missing-page HTML is branded, navigable and non-indexable', () => {
+  const html = dist('404.html');
+  assert.match(html, /<h1>Page not found<\/h1>/);
+  assert.match(html, /<title>Page not found — Ovelo<\/title>/);
+  assert.match(html, /<meta name="robots" content="noindex, nofollow">/);
+  assert.match(html, /href="\/">Go home<\/a>/);
+  assert.doesNotMatch(html, /rel="canonical"/);
+});

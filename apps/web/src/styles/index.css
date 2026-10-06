@@ -825,6 +825,15 @@ textarea:focus-visible {
 .record-upload > :last-child {
   grid-column: 1 / -1;
 }
+.upload-acknowledgement {
+  grid-column: 1 / -1;
+}
+.attach-callout > div:last-child {
+  min-width: 0;
+}
+.record-card > div {
+  min-width: 0;
+}
 .record-modal {
   width: min(640px, calc(100% - 32px));
   max-height: 90vh;
@@ -846,6 +855,23 @@ textarea:focus-visible {
   gap: 10px;
   align-items: center;
   padding: 8px 0;
+}
+.consent-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+  padding: 12px 0;
+}
+.consent-row input {
+  flex: 0 0 auto;
+  margin-top: 4px;
+}
+.consent-row a {
+  color: var(--accent);
+  text-decoration: underline;
 }
 .success-note {
   padding: 12px;
@@ -945,6 +971,13 @@ textarea:focus-visible {
 }
 .public-info h1 {
   font-size: clamp(32px, 6vw, 58px);
+}
+.not-found {
+  min-height: 60vh;
+  padding-top: 50px !important;
+}
+.not-found p {
+  margin: 20px 0 30px;
 }
 .public-sections {
   display: grid;
@@ -2141,6 +2174,7 @@ textarea:focus-visible {
   background: #302122;
 }
 .admin-main {
+  min-width: 0;
   width: calc(100% - 250px);
   margin-left: 250px;
 }
@@ -2175,9 +2209,21 @@ textarea:focus-visible {
   padding: 43px 47px;
   max-width: 1250px;
 }
+.admin-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 24px 0;
+}
+.admin-pagination span {
+  color: var(--muted);
+  font-size: 12px;
+}
 .admin-metrics {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 9px;
 }
 .admin-metric {
@@ -2257,6 +2303,46 @@ textarea:focus-visible {
   overflow: auto;
 }
 @media (max-width: 1000px) {
+  .admin-shell {
+    display: block;
+  }
+  .admin-sidebar {
+    position: relative;
+    inset: auto;
+    width: 100%;
+    padding: 20px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .admin-label {
+    margin: 20px 12px 10px;
+  }
+  .admin-sidebar nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .admin-sidebar nav a {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+  .admin-main {
+    margin-left: 0;
+    width: 100%;
+  }
+  .admin-topbar {
+    padding: 20px;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .admin-content {
+    padding: 24px 20px;
+  }
+  .admin-sidebar > .button {
+    align-self: flex-start;
+    margin-top: 16px;
+  }
   .hero {
     grid-template-columns: 1fr 1fr;
   }
@@ -2285,6 +2371,38 @@ textarea:focus-visible {
   }
 }
 @media (max-width: 760px) {
+  .admin-content {
+    padding: 20px 16px;
+  }
+  .admin-content .section-head {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .admin-content .record-card {
+    flex-direction: column;
+  }
+  .admin-content .record-card > div {
+    min-width: 0;
+  }
+  .admin-content .button {
+    min-height: 44px;
+    white-space: normal;
+  }
+  .admin-card {
+    padding: 18px;
+  }
+  .admin-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .admin-metric strong {
+    overflow-wrap: anywhere;
+  }
+  .admin-login {
+    padding: 16px;
+  }
+  .admin-login-card {
+    padding: 22px;
+  }
   .landing-nav {
     padding: 21px 20px;
   }

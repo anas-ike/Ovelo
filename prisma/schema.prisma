@@ -75,7 +75,18 @@ model User {
   subscription Subscription?
   securityEvents SecurityEvent[]
   adminAudits AdminAuditLog[]
+  policyConsents PolicyConsent[]
   @@index([createdAt])
+}
+model PolicyConsent {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @db.Uuid
+  policy String
+  version String
+  acceptedAt DateTime @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([userId, policy, version])
+  @@index([userId, policy])
 }
 model Account {
   id String @id @default(uuid()) @db.Uuid

@@ -50,8 +50,8 @@ function safeFile(pathname) {
   return candidate;
 }
 
-function sendFile(response, file) {
-  response.statusCode = 200;
+function sendFile(response, file, status = 200) {
+  response.statusCode = status;
   response.setHeader(
     'Content-Type',
     contentTypes[extname(file).toLowerCase()] || 'application/octet-stream',
@@ -80,6 +80,15 @@ const server = createServer(async (request, response) => {
     return response.end('Invalid request.');
   }
   const publicPages = new Set(['/', '/how-it-works', '/terms', '/privacy']);
+  response.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  response.setHeader('X-Content-Type-Options', 'nosniff');
+  response.setHeader('X-Frame-Options', 'DENY');
+  if (process.env.NODE_ENV === 'production')
+    response.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  if (!publicPages.has(pathname) && !extname(pathname)) {
+    response.setHeader('X-Robots-Tag', 'noindex, nofollow');
+    response.setHeader('Cache-Control', 'no-store');
+  }
   const publicRedirects = new Map([
     ['/how-it-works/', '/how-it-works'],
     ['/terms/', '/terms'],
@@ -147,12 +156,14 @@ const server = createServer(async (request, response) => {
     }
   }
   response.setHeader('Permissions-Policy', 'camera=(self), microphone=(), geolocation=()');
-  const htmlRequest = request.method === 'GET' && (pathname === '/' || !extname(pathname));
+  const htmlRequest =
+    ['GET', 'HEAD'].includes(request.method) && (pathname === '/' || !extname(pathname));
   if (htmlRequest)
     response.setHeader(
       'X-Robots-Tag',
       publicPages.has(pathname) ? 'index, follow' : 'noindex, nofollow',
     );
+  if (htmlRequest && !publicPages.has(pathname)) response.setHeader('Cache-Control', 'no-store');
   const requested = safeFile(request.url || '/');
   const knownAppRoute =
     publicPages.has(pathname) ||
@@ -180,13 +191,15 @@ const server = createServer(async (request, response) => {
       '/admin/forgot-password',
       '/admin/reset-password',
     ].includes(pathname) ||
-    /^\/(item|i)\//.test(pathname) ||
+    /^\/item\/[^/]+(?:\/edit)?$/.test(pathname) ||
+    /^\/i\/[^/]+$/.test(pathname) ||
     /^\/admin\//.test(pathname);
   const publicPage =
     publicPages.has(pathname) && pathname !== '/'
       ? join(root, pathname.slice(1), 'index.html')
       : null;
   if (pathname !== '/' && !knownAppRoute && !extname(pathname)) {
+    if (existsSync(join(root, '404.html'))) return sendFile(response, join(root, '404.html'), 404);
     response.statusCode = 404;
     return response.end('Not found.');
   }

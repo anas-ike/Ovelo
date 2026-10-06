@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Route, Routes } from 'react-router-dom';
 import { AppLayout } from './layouts/AppLayout';
 import { ProtectedRoute } from './layouts/ProtectedRoute';
 import { Landing } from './pages/Landing';
@@ -6,6 +6,7 @@ import { lazy, Suspense } from 'react';
 import { AdminProtectedRoute } from './layouts/AdminProtectedRoute';
 import { PublicInfo } from './pages/PublicInfo';
 import { SeoHead } from './components/SeoHead';
+import { NotFound } from './pages/NotFound';
 const Login = lazy(() => import('./pages/auth/Login').then((m) => ({ default: m.Login })));
 const Register = lazy(() => import('./pages/auth/Register').then((m) => ({ default: m.Register })));
 const VerifyEmail = lazy(() =>
@@ -137,9 +138,9 @@ export function App() {
                   />
                 }
               />
-              <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Route>
           </Route>
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
     </>

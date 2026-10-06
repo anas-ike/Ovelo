@@ -3,6 +3,42 @@
 // CommonJS matches the root package; applications consume this at build/startup.
 module.exports.changelog = [
   {
+    version: '0.4.0',
+    name: 'Account Isolation, Consent and Administrator UX',
+    date: '2026-10-06',
+    changes: [
+      'Separate provider sign-in from explicit, initiating-session-bound account linking; rotate replaced sessions and cancel pending OAuth on logout.',
+      'Clear private query/local state on identity changes, reject stale authentication responses and synchronize logout across tabs.',
+      'Store versioned Terms/Privacy/upload acknowledgements with server enforcement and unchecked, current-version-aware prompts.',
+      'Add administrator search/pagination, responsive console/dialog fixes, explicit unconfigured recovery and branded HTTP 404 handling.',
+    ],
+    verification: {
+      build: 'PASS — npm run build completed for v0.4.0',
+      typecheck: 'PASS',
+      lint: 'PASS',
+      dedicatedApi: 'PASS — 51 API tests passed with disposable PostgreSQL/Redis and one worker; no tests skipped',
+      isolatedBrowser:
+        'PASS — 10 workflow groups, 72 admin checks at 8 widths; simulated provider boundary',
+      productionDeployment: 'PASS — v0.4.0, web/API/worker started, ports unchanged, startup log secret check passed',
+      productionMigration: 'PASS — 20261005143000_policy_consents applied to production database',
+      productionPublic: 'PASS — public routes, HTTPS redirects, HSTS, noindex/private cache boundary, sitemap, robots, favicon, OG image, CORS and 404',
+      googleOAuth: 'BLOCKED — authorized live browser/account unavailable',
+      discordOAuth: 'BLOCKED — authorized live browser/account unavailable',
+      smtpDelivery: 'BLOCKED — previously configured SMTP authentication rejected with EAUTH',
+      administratorProvisioning: 'PARTIAL — production query observed 1 active primary administrator; credentialed login was not tested',
+      pdfUploads: 'BLOCKED — CLAMAV_HOST absent; fail-closed scanning preserved',
+      rootTests: 'PASS — 11 root tests',
+      defaultApiTests: 'PASS — 14 passed, 37 skipped without disposable services',
+      audit: 'PASS — 0 production vulnerabilities',
+      formatCheck: 'FAIL — 62 pre-existing repository-wide formatting warnings outside the focused release files',
+      lighthouse: 'BLOCKED — unavailable in the environment',
+      searchConsole: 'MANUAL ACTION REQUIRED',
+      analytics: 'NOT_CONFIGURED — no optional analytics or tracking code is present',
+      verdict:
+        'PARTIAL — implementation, isolated verification and deployment passed; live provider consent, SMTP delivery, PDF scanning, Lighthouse and Search Console remain blocked/manual',
+    },
+  },
+  {
     version: '0.3.0',
     name: 'SEO and Web Quality Optimization',
     date: '2026-10-05',

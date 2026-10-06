@@ -11,20 +11,26 @@ export function clearSessionCookies(response: Response, admin = false) {
 export async function createSession(
   userId: string,
   response: Response,
-  options: { admin?: boolean; userAgent?: string } = {},
+  options: { admin?: boolean; userAgent?: string; replaceSessionId?: string } = {},
 ) {
   const token = randomToken();
   const csrf = randomToken();
-  const session = await prisma.session.create({
-    data: {
-      userId,
-      tokenHash: hashToken(token),
-      csrfHash: hashToken(csrf),
-      admin: options.admin ?? false,
-      userAgent: options.userAgent?.slice(0, 500),
-      expiresAt: new Date(Date.now() + 1000 * 60 * 60 * (options.admin ? 2 : 24 * 30)),
-    },
-    select: { id: true },
+  const session = await prisma.$transaction(async (tx) => {
+    if (options.replaceSessionId)
+      await tx.session.deleteMany({
+        where: { id: options.replaceSessionId, admin: options.admin ?? false },
+      });
+    return tx.session.create({
+      data: {
+        userId,
+        tokenHash: hashToken(token),
+        csrfHash: hashToken(csrf),
+        admin: options.admin ?? false,
+        userAgent: options.userAgent?.slice(0, 500),
+        expiresAt: new Date(Date.now() + 1000 * 60 * 60 * (options.admin ? 2 : 24 * 30)),
+      },
+      select: { id: true },
+    });
   });
   const base = {
     httpOnly: true,
@@ -33,7 +39,10 @@ export async function createSession(
     path: '/',
   } as const;
   const maxAge = 1000 * 60 * 60 * (options.admin ? 2 : 24 * 30);
-  response.cookie(options.admin ? adminSessionCookie : env.SESSION_COOKIE_NAME, token, { ...base, maxAge });
+  response.cookie(options.admin ? adminSessionCookie : env.SESSION_COOKIE_NAME, token, {
+    ...base,
+    maxAge,
+  });
   response.cookie(options.admin ? adminCsrfCookie : 'ovelo_csrf', csrf, {
     httpOnly: true,
     secure: env.COOKIE_SECURE,

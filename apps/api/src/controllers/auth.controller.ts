@@ -5,10 +5,13 @@ import {
   resetSchema,
   tokenSchema,
   password,
+  policyConsentSchema,
+  policyVersions,
 } from '@ovelo/validation';
 import { asyncHandler } from '../utils/async-handler.js';
 import {
   authenticate,
+  requireLoginPolicyConsent,
   changePassword,
   register,
   requestPasswordReset,
@@ -17,21 +20,48 @@ import {
   verifyEmail,
   publicUserSelect,
 } from '../auth/auth.service.js';
-import { createSession, destroyAllSessions, destroySession } from '../auth/session.service.js';
+import {
+  createSession,
+  destroyAllSessions,
+  destroySession,
+  clearSessionCookies,
+} from '../auth/session.service.js';
 import { prisma } from '../database/prisma.js';
 import { AppError } from '../middleware/error.js';
-import { pendingCookie, pendingIdentity } from '../auth/oauth-pending.service.js';
+import {
+  pendingCookie,
+  pendingIdentity,
+  clearPendingOAuth,
+} from '../auth/oauth-pending.service.js';
+import {
+  assertPolicyVersions,
+  currentPolicyStatus,
+  requireCurrentPolicyConsent,
+} from '../auth/policy-consent.service.js';
 export const registerController = asyncHandler(async (req, res) => {
   const body = registerSchema.parse(req.body);
-  const identity = await pendingIdentity(req.cookies?.[pendingCookie], true);
-  res.clearCookie(pendingCookie, { path: '/' });
+  assertPolicyVersions(body, ['TERMS', 'PRIVACY']);
+  const identity = await pendingIdentity(req.cookies?.[pendingCookie]);
+  if (identity?.userId)
+    throw new AppError(
+      400,
+      'OAUTH_PENDING_INVALID',
+      'Complete policy acceptance to sign in to your existing account.',
+    );
   const user = await register(body, identity);
+  await pendingIdentity(req.cookies?.[pendingCookie], true);
+  res.clearCookie(pendingCookie, { path: '/' });
   res.status(201).json({ data: { user } });
 });
 export const loginController = asyncHandler(async (req, res) => {
   const body = loginSchema.parse(req.body);
   const user = await authenticate(body.email, body.password);
-  await createSession(user.id, res, { userAgent: req.get('user-agent') });
+  await requireLoginPolicyConsent(user.id, body);
+  await clearPendingOAuth(req.cookies, res);
+  await createSession(user.id, res, {
+    userAgent: req.get('user-agent'),
+    replaceSessionId: req.auth?.sessionId,
+  });
   res.json({
     data: {
       user: {
@@ -45,12 +75,28 @@ export const loginController = asyncHandler(async (req, res) => {
   });
 });
 export const logoutController = asyncHandler(async (req, res) => {
+  await clearPendingOAuth(req.cookies, res);
   if (req.auth) await destroySession(req.auth.sessionId, res);
-  else {
-    res.clearCookie('ovelo_session', { path: '/' });
-    res.clearCookie('ovelo_csrf', { path: '/' });
-  }
+  else clearSessionCookies(res);
   res.status(204).send();
+});
+export const policiesController = asyncHandler(async (req, res) => {
+  res.json({
+    data: req.auth
+      ? await currentPolicyStatus(req.auth.userId)
+      : {
+          versions: policyVersions,
+          accepted: { terms: false, privacy: false, uploadProcessing: false },
+        },
+  });
+});
+export const acceptPoliciesController = asyncHandler(async (req, res) => {
+  const body = policyConsentSchema.parse(req.body);
+  const required = body.uploadProcessingVersion
+    ? (['UPLOAD_PROCESSING'] as const)
+    : (['TERMS', 'PRIVACY'] as const);
+  await requireCurrentPolicyConsent(req.auth!.userId, body, [...required]);
+  res.json({ data: await currentPolicyStatus(req.auth!.userId) });
 });
 export const meController = asyncHandler(async (req, res) => {
   const user = await prisma.user.findUniqueOrThrow({
@@ -66,7 +112,11 @@ export const verifyController = asyncHandler(async (req, res) => {
 });
 export const forgotController = asyncHandler(async (req, res) => {
   const { email } = loginSchema.pick({ email: true }).parse(req.body);
-  try { await requestPasswordReset(email); } catch { /* Accepted response never enumerates accounts or SMTP availability. */ }
+  try {
+    await requestPasswordReset(email);
+  } catch {
+    /* Accepted response never enumerates accounts or SMTP availability. */
+  }
   res.json({ data: { accepted: true } });
 });
 export const resetController = asyncHandler(async (req, res) => {
@@ -100,11 +150,17 @@ export const revokeSessionController = asyncHandler(async (req, res) => {
   res.status(204).send();
 });
 export const logoutAllController = asyncHandler(async (req, res) => {
+  await clearPendingOAuth(req.cookies, res);
   await destroyAllSessions(req.auth!.userId, res);
   res.status(204).send();
 });
 export const changeEmailController = asyncHandler(async (req, res) => {
-  if (req.auth!.role !== 'USER') throw new AppError(403, 'ADMIN_IDENTITY_PROTECTED', 'Administrator identity changes require owner-controlled administration.');
+  if (req.auth!.role !== 'USER')
+    throw new AppError(
+      403,
+      'ADMIN_IDENTITY_PROTECTED',
+      'Administrator identity changes require owner-controlled administration.',
+    );
   const body = emailChangeSchema.parse(req.body);
   await requestEmailChange(req.auth!.userId, body.email);
   res.json({ data: { accepted: true } });
@@ -116,6 +172,7 @@ export const exportController = asyncHandler(async (req, res) => {
       name: true,
       email: true,
       createdAt: true,
+      policyConsents: { select: { policy: true, version: true, acceptedAt: true } },
       items: {
         where: { deletedAt: null },
         select: {
@@ -162,7 +219,12 @@ export const exportController = asyncHandler(async (req, res) => {
   res.json(user);
 });
 export const deleteAccountController = asyncHandler(async (req, res) => {
-  if (req.auth!.role !== 'USER') throw new AppError(403, 'ADMIN_IDENTITY_PROTECTED', 'Remove administrator privileges through the owner before deleting an account.');
+  if (req.auth!.role !== 'USER')
+    throw new AppError(
+      403,
+      'ADMIN_IDENTITY_PROTECTED',
+      'Remove administrator privileges through the owner before deleting an account.',
+    );
   await prisma.$transaction([
     prisma.user.update({
       where: { id: req.auth!.userId },
@@ -179,7 +241,7 @@ export const deleteAccountController = asyncHandler(async (req, res) => {
       data: { userId: req.auth!.userId, type: 'ACCOUNT_DELETION_REQUESTED' },
     }),
   ]);
-  res.clearCookie('ovelo_session', { path: '/' });
-  res.clearCookie('ovelo_csrf', { path: '/' });
+  await clearPendingOAuth(req.cookies, res);
+  clearSessionCookies(res);
   res.status(202).json({ data: { deleted: true } });
 });

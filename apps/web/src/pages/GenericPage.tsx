@@ -4,6 +4,7 @@ import { get } from '../lib/api';
 import { EmptyState } from '../components/EmptyState';
 import { Loading } from '../components/Loading';
 import { Link } from 'react-router-dom';
+import { OAuthButtons } from '../features/auth/OAuthButtons';
 export function GenericPage({
   title,
   description,
@@ -30,7 +31,16 @@ export function GenericPage({
           <FolderOpen size={23} />
         </span>
       </div>
-      {endpoint && query.isLoading ? (
+      {title === 'Settings' ? (
+        <section className="detail-section">
+          <h3>Connect a provider to this account</h3>
+          <p>
+            Connecting a provider lets that identity sign in to your current Ovelo account. To
+            switch accounts, sign out and use the sign-in page.
+          </p>
+          <OAuthButtons mode="link" />
+        </section>
+      ) : endpoint && query.isLoading ? (
         <Loading rows={4} />
       ) : endpoint && query.error ? (
         <div className="page-error">Could not load this section.</div>
@@ -39,9 +49,9 @@ export function GenericPage({
           title={`Your ${title.toLowerCase()} will live here`}
           description="Add records from the ownership pages and they will appear here, connected to the things they belong to."
           action={
-             <Link className="text-button" to="/how-it-works">
+            <Link className="text-button" to="/how-it-works">
               Learn how it works <ArrowUpRight size={15} />
-             </Link>
+            </Link>
           }
         />
       )}

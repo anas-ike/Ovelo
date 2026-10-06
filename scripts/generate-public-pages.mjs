@@ -28,7 +28,7 @@ function bodyFor(pathname) {
   const kind = pathname === '/how-it-works' ? 'help' : pathname.slice(1);
   const title =
     kind === 'help' ? 'How Ovelo works' : kind === 'terms' ? 'Terms of Service' : 'Privacy Policy';
-  return `<a class="skip-link" href="#main-content">Skip to content</a><header class="landing-nav">${brand()}<nav aria-label="Public navigation">${link('/', 'Home')}${link('/how-it-works', 'How it works')}${link('/terms', 'Terms')}${link('/privacy', 'Privacy')}${link('/login', 'Sign in')}</nav></header><main id="main-content" class="public-info"><div class="section-intro"><span class="eyebrow">OVELO / ${escape(kind)}</span><h1>${title}</h1><p>${kind === 'help' ? 'A practical guide to keeping the record behind everything you own.' : 'Last updated: 2026-10-05'}</p></div><div class="public-sections">${content[kind].map(([heading, text], index) => `<section class="detail-section"><span class="eyebrow">${String(index + 1).padStart(2, '0')}</span><h2>${escape(heading)}</h2><p>${escape(text)}</p></section>`).join('')}</div>${kind === 'help' ? link('/register', 'Create your Ovelo account', 'button button-primary') : ''}</main>${footer()}`;
+  return `<a class="skip-link" href="#main-content">Skip to content</a><header class="landing-nav">${brand()}<nav aria-label="Public navigation">${link('/', 'Home')}${link('/how-it-works', 'How it works')}${link('/terms', 'Terms')}${link('/privacy', 'Privacy')}${link('/login', 'Sign in')}</nav></header><main id="main-content" class="public-info"><div class="section-intro"><span class="eyebrow">OVELO / ${escape(kind)}</span><h1>${title}</h1><p>${kind === 'help' ? 'A practical guide to keeping the record behind everything you own.' : 'Last updated: 2026-10-06'}</p></div><div class="public-sections">${content[kind].map(([heading, text], index) => `<section class="detail-section"><span class="eyebrow">${String(index + 1).padStart(2, '0')}</span><h2>${escape(heading)}</h2><p>${escape(text)}</p></section>`).join('')}</div>${kind === 'help' ? link('/register', 'Create your Ovelo account', 'button button-primary') : ''}</main>${footer()}`;
 }
 const ld = JSON.stringify({
   '@context': 'https://schema.org',
@@ -73,3 +73,10 @@ const privateHtml = template
     '<meta name="robots" content="noindex, nofollow"><meta name="googlebot" content="noindex, nofollow"></head>',
   );
 writeFileSync(join(dist, 'private.html'), privateHtml);
+const notFound = privateHtml
+  .replace('<title>Private workspace — Ovelo</title>', '<title>Page not found — Ovelo</title>')
+  .replace(
+    '<div id="root"></div>',
+    `<div id="root"><div class="landing public-info"><a class="skip-link" href="#main-content">Skip to content</a><header class="landing-nav">${brand()}<nav aria-label="Public navigation">${link('/', 'Home')}${link('/how-it-works', 'How it works')}${link('/login', 'Sign in')}</nav></header><main id="main-content" class="not-found"><span class="eyebrow">OVELO / 404</span><h1>Page not found</h1><p>This page may have moved, or the address may be incorrect.</p><div class="record-actions">${link('/', 'Go home', 'button button-primary')}${link('/dashboard', 'Open my inventory', 'button button-ghost')}</div></main></div></div>`,
+  );
+writeFileSync(join(dist, '404.html'), notFound);

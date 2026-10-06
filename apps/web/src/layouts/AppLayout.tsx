@@ -27,6 +27,8 @@ const nav = [
 ];
 export function AppLayout() {
   const [open, setOpen] = useState(false);
+  const [logoutError, setLogoutError] = useState('');
+  const [signingOut, setSigningOut] = useState(false);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -90,7 +92,22 @@ export function AppLayout() {
               <strong>{user?.name}</strong>
               <span>{user?.email}</span>
             </div>
-            <button className="more-button" onClick={() => void logout()} aria-label="Sign out">
+            <button
+              className="more-button"
+              disabled={signingOut}
+              onClick={() => {
+                setSigningOut(true);
+                setLogoutError('');
+                void logout()
+                  .catch((e) =>
+                    setLogoutError(
+                      e instanceof Error ? e.message : 'Could not sign out. Try again.',
+                    ),
+                  )
+                  .finally(() => setSigningOut(false));
+              }}
+              aria-label="Sign out"
+            >
               ↗
             </button>
           </div>
@@ -131,6 +148,11 @@ export function AppLayout() {
           </div>
         </header>
         <div className="page-content">
+          {logoutError && (
+            <p role="alert" className="form-alert">
+              {logoutError}
+            </p>
+          )}
           <Outlet />
         </div>
       </main>

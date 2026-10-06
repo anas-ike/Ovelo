@@ -11,8 +11,26 @@ export const email = z
   .transform((v) => v.toLowerCase());
 export const password = z.string().min(12, 'Use at least 12 characters').max(128);
 export const adminPassword = z.string().min(16, 'Use at least 16 characters').max(128);
-export const registerSchema = z.object({ name: text(100).min(1), email, password }).strict();
-export const loginSchema = z.object({ email, password: z.string().min(1).max(128) }).strict();
+export const policyVersions = {
+  terms: '2026-10-06',
+  privacy: '2026-10-06',
+  uploadProcessing: '2026-10-06',
+} as const;
+export const policyConsentSchema = z
+  .object({
+    termsVersion: z.string().trim().max(32).optional(),
+    privacyVersion: z.string().trim().max(32).optional(),
+    uploadProcessingVersion: z.string().trim().max(32).optional(),
+  })
+  .strict();
+export const registerSchema = z
+  .object({ name: text(100).min(1), email, password })
+  .merge(policyConsentSchema)
+  .strict();
+export const loginSchema = z
+  .object({ email, password: z.string().min(1).max(128) })
+  .merge(policyConsentSchema)
+  .strict();
 export const emailChangeSchema = z.object({ email }).strict();
 export const tokenSchema = z.object({ token: z.string().regex(/^[a-f0-9]{64}$/) }).strict();
 export const resetSchema = tokenSchema.extend({ password });

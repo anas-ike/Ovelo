@@ -3,6 +3,7 @@ import request from 'supertest';
 import argon2 from 'argon2';
 import { app } from '../src/app.js';
 import { prisma } from '../src/database/prisma.js';
+import { policyVersions } from '@ovelo/validation';
 
 const enabled = process.env.RUN_DB_TESTS === 'true';
 describe.skipIf(!enabled)('resource isolation', () => {
@@ -58,7 +59,12 @@ describe.skipIf(!enabled)('resource isolation', () => {
     const agent = request.agent(app);
     const login = await agent
       .post('/api/v1/auth/login')
-      .send({ email: secondEmail, password: 'isolation-test-password-123' });
+      .send({
+        email: secondEmail,
+        password: 'isolation-test-password-123',
+        termsVersion: policyVersions.terms,
+        privacyVersion: policyVersions.privacy,
+      });
     expect(login.status).toBe(200);
     const response = await agent.get(`/api/v1/items/${itemId}`);
     expect(response.status).toBe(404);
@@ -67,7 +73,12 @@ describe.skipIf(!enabled)('resource isolation', () => {
     const agent = request.agent(app);
     await agent
       .post('/api/v1/auth/login')
-      .send({ email: firstEmail, password: 'isolation-test-password-123' });
+      .send({
+        email: firstEmail,
+        password: 'isolation-test-password-123',
+        termsVersion: policyVersions.terms,
+        privacyVersion: policyVersions.privacy,
+      });
     const response = await agent.get('/api/v1/admin/overview');
     expect(response.status).toBe(401); // A normal user cookie is not an administrator session.
     expect(firstId).toBeTruthy();

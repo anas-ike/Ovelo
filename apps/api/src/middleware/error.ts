@@ -9,6 +9,7 @@ export class AppError extends Error {
     public status: number,
     public code: string,
     message: string,
+    public details?: unknown,
   ) {
     super(message);
   }
@@ -19,13 +20,31 @@ export const errorHandler: ErrorRequestHandler = (error, req, res, next) => {
   void next;
   const requestId = res.locals.requestId as string | undefined;
   if (req.adminAuth && req.path.startsWith('/api/v1/admin/')) {
-    const denied = error instanceof ZodError || error instanceof AppError && error.status < 500 || error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
-    void auditAdmin(req, res, `ADMIN_ACTION_${req.method}_DENIED`, 'API', String(req.route?.path || 'unknown').slice(0, 100), denied ? 'DENIED' : 'FAILED', req.adminAuth.userId).catch(() => logger.error({ subsystem: 'admin-audit', requestId }, 'Audit write failed'));
+    const denied =
+      error instanceof ZodError ||
+      (error instanceof AppError && error.status < 500) ||
+      (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002');
+    void auditAdmin(
+      req,
+      res,
+      `ADMIN_ACTION_${req.method}_DENIED`,
+      'API',
+      String(req.route?.path || 'unknown').slice(0, 100),
+      denied ? 'DENIED' : 'FAILED',
+      req.adminAuth.userId,
+    ).catch(() => logger.error({ subsystem: 'admin-audit', requestId }, 'Audit write failed'));
   }
   if (error instanceof AppError)
     return res
       .status(error.status)
-      .json({ error: { code: error.code, message: error.message, requestId } });
+      .json({
+        error: {
+          code: error.code,
+          message: error.message,
+          ...(error.details ? { details: error.details } : {}),
+          requestId,
+        },
+      });
   if (error instanceof ZodError)
     return res.status(400).json({
       error: {
@@ -40,7 +59,13 @@ export const errorHandler: ErrorRequestHandler = (error, req, res, next) => {
       .status(409)
       .json({ error: { code: 'CONFLICT', message: 'That value is already in use.', requestId } });
   logger.error(
-    { errorType: error instanceof Error ? error.name : 'UnknownError', code: redisFailure(error) === 'REDIS_UNAVAILABLE' ? 'UNEXPECTED_ERROR' : redisFailure(error), requestId, method: req.method, route: req.route?.path },
+    {
+      errorType: error instanceof Error ? error.name : 'UnknownError',
+      code: redisFailure(error) === 'REDIS_UNAVAILABLE' ? 'UNEXPECTED_ERROR' : redisFailure(error),
+      requestId,
+      method: req.method,
+      route: req.route?.path,
+    },
     'Unhandled request error',
   );
   return res.status(500).json({

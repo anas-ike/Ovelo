@@ -2,6 +2,24 @@
 
 Every meaningful production pass adds a release here and in [CHANGELOG.js](CHANGELOG.js). The root package version is the application version. See [release workflow](docs/releases.md) and [production verification](docs/production-verification.md). Previous history is retained.
 
+## v0.4.0 — Account Isolation, Consent and Administrator UX
+
+Date: 2026-10-06
+
+### Implemented
+
+- Provider sign-in remains sign-in even when a previous identity is cached. Account linking is explicit in Settings, CSRF-protected, and bound to the exact initiating session. Linking preserves that session; successful account switches rotate and revoke the replaced browser session.
+- Logout clears pending OAuth transactions/cookies and private frontend query/local state. Authentication response generations prevent stale `/auth/me` from restoring logged-out identity; cross-tab changes and focus/session-expiry checks refresh the identity boundary.
+- Additive `PolicyConsent` migration stores policy/version/acceptance time. Account creation, applicable email/provider sign-in, and upload acknowledgement enforce current versions server-side. Checkboxes start unchecked; current acceptance suppresses repeat prompts. Upload acknowledgement is checked before multipart parsing, scanning and storage.
+- Administrator search/pagination, narrow-width navigation/cards/forms/dialogs, in-dialog errors, honest unconfigured recovery, private HTML cache headers, and a branded genuine HTTP 404 page.
+
+### Verification
+
+- Root tests: **PASS — 11 tests**. Default API suite: **PASS — 14 passed, 37 skipped without disposable services**. Dedicated serial PostgreSQL/Redis API suite: **PASS — 51 tests, none skipped**. Build, typecheck, lint, audit and focused secret scan: **PASS**; `npm audit --omit=dev` reports 0 vulnerabilities.
+- Isolated browser evidence: 10 workflow groups; all nine administrator sections at 320, 360, 375, 390, 412, 768, 1024 and 1440px (72 responsive checks), dialog overflow/Escape, mobile administrator creation/error recovery, consent persistence, cross-tab logout, delayed authentication and private query-cache isolation. Production public Chromium: 28 checks at 320, 390, 768 and 1440px.
+- Production v0.4.0 deployment and additive policy migration: **PASS**. Web/API/worker started with unchanged ports; public routes, HTTPS redirects/HSTS, CORS, sitemap, robots, favicon, OG image, private noindex/cache boundary and real 404 passed.
+- Successful **live** Google/Discord consent, authenticated production workflows and recovery email delivery remain blocked by external account/configuration access. Isolated provider and SMTP boundaries are simulated. Production currently has one active primary administrator, but no administrator credential was used in verification.
+
 ## v0.3.0 — SEO and Web Quality Optimization
 
 Date: 2026-10-05

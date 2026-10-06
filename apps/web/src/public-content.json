@@ -64,10 +64,14 @@
     ],
     [
       "Changes and contact",
-      "We may update these terms as the service changes. The last-updated date identifies this version. Contact contact@lightsout.in with service or account questions. No legal certification or regulatory compliance endorsement is claimed."
+      "We may update these terms as the service changes. The last-updated date identifies this version. Account creation and the next sign-in after a policy update require explicit acceptance of the current Terms and acknowledgement of the Privacy Policy. Contact contact@lightsout.in with service or account questions. No legal certification or regulatory compliance endorsement is claimed."
     ]
   ],
   "privacy": [
+    [
+      "Policy acknowledgements",
+      "Ovelo stores the policy name, accepted version and timestamp linked to your account when you accept the Terms, acknowledge this Privacy Policy, or acknowledge upload processing. These records let us request acknowledgement when a version changes without repeating the prompt while your accepted version is current. Upload processing acknowledgement is required before accepting a document upload."
+    ],
     [
       "Account and authentication information",
       "Ovelo stores your account name, email, verification status and role. Passwords are stored as password hashes. Google sign-in uses a verified identity/email; Discord uses the identify scope by default. Provider account identifiers are stored for explicit linking. OAuth code exchanges take place server-side; provider secrets and access tokens are not exposed to frontend JavaScript."

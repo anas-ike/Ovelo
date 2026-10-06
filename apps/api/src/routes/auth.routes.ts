@@ -8,6 +8,7 @@ import {
   googleStart,
   providerCapabilities,
   pendingProvider,
+  consentProvider,
   linkProvider,
 } from '../controllers/oauth.controller.js';
 import { csrfTokenController } from '../controllers/csrf.controller.js';
@@ -26,10 +27,21 @@ import {
   logoutAllController,
   exportController,
   deleteAccountController,
+  policiesController,
+  acceptPoliciesController,
 } from '../controllers/auth.controller.js';
 export const authRouter = Router();
 authRouter.get('/providers', providerCapabilities);
+authRouter.get('/policies', policiesController);
+authRouter.post(
+  '/policies',
+  requireAuth,
+  csrf,
+  rateLimit('policy-consent', 20),
+  acceptPoliciesController,
+);
 authRouter.get('/oauth/pending', pendingProvider);
+authRouter.post('/oauth/consent', rateLimit('oauth-consent', 5), consentProvider);
 authRouter.get('/csrf', requireAuth, csrfTokenController);
 authRouter.post('/:provider/link', requireAuth, csrf, rateLimit('oauth-link', 10), linkProvider);
 authRouter.post('/register', rateLimit('register', 5), registerController);

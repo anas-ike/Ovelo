@@ -34,7 +34,7 @@ export function PublicInfo({ kind }: { kind: 'help' | 'terms' | 'privacy' }) {
           <p>
             {kind === 'help'
               ? 'A practical guide to keeping the record behind everything you own.'
-              : 'Last updated: 2026-10-05'}
+              : 'Last updated: 2026-10-06'}
           </p>
         </div>
         <div className="public-sections">
