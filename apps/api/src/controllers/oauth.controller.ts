@@ -7,11 +7,24 @@ import { AppError } from '../middleware/error.js';
 import { z } from 'zod';
 import { logger } from '../utils/logger.js';
 import { requireCurrentPolicyConsent } from '../auth/policy-consent.service.js';
-import { createSession } from '../auth/session.service.js';
+import { createSession, destroySession } from '../auth/session.service.js';
 import { prisma } from '../database/prisma.js';
+import { oauthResultCookie, pendingOAuthResult, saveOAuthResult } from '../auth/oauth-result.service.js';
+import { publicUserSelect } from '../auth/auth.service.js';
 
 export const providerCapabilities = asyncHandler(async (_req, res) => {
   res.json({ data: oauthCapabilities() });
+});
+export const providerResult = asyncHandler(async (req, res) => {
+  const result = await pendingOAuthResult(req.cookies?.[oauthResultCookie]);
+  if (!result || !req.auth || req.auth.admin || result.userId !== req.auth.userId || result.sessionId !== req.auth.sessionId) {
+    logger.warn({ code: 'OAUTH_SESSION_MISMATCH', requestId: res.locals.requestId }, 'OAuth browser session confirmation failed');
+    throw new AppError(401, 'OAUTH_SESSION_MISMATCH', 'Your sign-in session could not be confirmed. Please start sign-in again.');
+  }
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: result.userId }, select: publicUserSelect });
+  // Remains readable for the short TTL so retries/StrictMode are idempotent;
+  // starting another sign-in or logout deletes it immediately.
+  res.json({ data: { user } });
 });
 export const pendingProvider = asyncHandler(async (req, res) => {
   const identity = await pendingIdentity(req.cookies?.[pendingCookie]);
@@ -47,14 +60,22 @@ export const consentProvider = asyncHandler(async (req, res) => {
   await requireCurrentPolicyConsent(user.id, body, ['TERMS', 'PRIVACY']);
   await pendingIdentity(req.cookies?.[pendingCookie], true);
   await prisma.securityEvent.create({ data: { userId: user.id, type: 'OAUTH_LOGIN' } });
-  await createSession(user.id, res, {
+  const sessionId = await createSession(user.id, res, {
     userAgent: req.get('user-agent'),
     replaceSessionId: req.auth?.sessionId,
   });
+  try {
+    await saveOAuthResult(user.id, sessionId, res);
+  } catch (error) {
+    await destroySession(sessionId, res);
+    throw error;
+  }
   res.clearCookie(pendingCookie, { path: '/' });
   res.json({ data: { authenticated: true } });
 });
 export const linkProvider = asyncHandler(async (req, res) => {
+  if (req.body?.intent !== 'link-account')
+    throw new AppError(400, 'ACCOUNT_LINK_CONFIRMATION_REQUIRED', 'Confirm account linking from Settings. To sign in to a different account, use the sign-in page.');
   const provider = z.enum(['google', 'discord']).parse(req.params.provider);
   res.json({
     data: {
@@ -121,6 +142,7 @@ async function callback(provider: 'google' | 'discord', req: Request, res: Respo
       'OAUTH_EMAIL_MISMATCH',
     ];
     const code = allowed.includes(error.code) ? error.code : 'OAUTH_FAILED';
+    logger.warn({ provider, code, requestId: res.locals.requestId }, 'OAuth callback rejected');
     res.redirect(`${env.APP_URL}/${res.locals.oauthAdminLogin ? 'admin/login' : 'login'}?oauthError=${code}`);
   }
 }

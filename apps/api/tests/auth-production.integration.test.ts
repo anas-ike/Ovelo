@@ -252,7 +252,7 @@ describe.skipIf(process.env.RUN_DB_TESTS !== 'true')('production authentication 
           .get('/api/v1/auth/google/callback')
           .query({ state: stateAfterRegistration, code: 'test-code' })
       ).headers.location,
-    ).toBe(`${appOrigin}/dashboard`);
+    ).toBe(`${appOrigin}/auth/complete`);
     expect((await agent.get('/api/v1/auth/me')).body.data.user.email).toBe(googleEmail);
     const replay = await agent
       .get('/api/v1/auth/google/callback')
@@ -266,7 +266,7 @@ describe.skipIf(process.env.RUN_DB_TESTS !== 'true')('production authentication 
           .get('/api/v1/auth/google/callback')
           .query({ state: secondState, code: 'test-code' })
       ).headers.location,
-    ).toBe(`${appOrigin}/dashboard`);
+    ).toBe(`${appOrigin}/auth/complete`);
     expect(await prisma.user.count({ where: { email: googleEmail } })).toBe(1);
   });
   it('rejects incorrect Google nonces and mismatched browser state', async () => {
@@ -328,7 +328,7 @@ describe.skipIf(process.env.RUN_DB_TESTS !== 'true')('production authentication 
     expect(
       (await agent.get('/api/v1/auth/discord/callback').query({ state: state3, code: 'test-code' }))
         .headers.location,
-    ).toBe(`${appOrigin}/dashboard`);
+    ).toBe(`${appOrigin}/auth/complete`);
     expect((await agent.get('/api/v1/auth/me')).body.data.user.email).toBe(discordEmail);
   });
   it('switches Google A → logout → Discord B with fresh identity and bidirectional resource isolation', async () => {
@@ -402,7 +402,7 @@ describe.skipIf(process.env.RUN_DB_TESTS !== 'true')('production authentication 
     expect(
       (await a.get('/api/v1/auth/discord/callback').query({ state: stateB, code: 'test-code' }))
         .headers.location,
-    ).toBe(`${appOrigin}/dashboard`);
+    ).toBe(`${appOrigin}/auth/complete`);
     expect((await a.get('/api/v1/auth/me')).body.data.user.id).toBe(userB.id);
     expect((await a.get(`/api/v1/items/${itemB.id}`)).status).toBe(200);
     for (const path of [
@@ -446,6 +446,57 @@ describe.skipIf(process.env.RUN_DB_TESTS !== 'true')('production authentication 
       (await a.delete(`/api/v1/documents/${documentA.id}`).set('X-CSRF-Token', csrfB)).status,
     ).toBe(404);
     expect((await a.post('/api/v1/auth/logout').set('X-CSRF-Token', csrfA)).status).toBe(403);
+  });
+  it('confirms the exact provider-created session and rejects missing or different browser sessions', async () => {
+    const google = request.agent(app).set('X-Forwarded-For', '198.51.100.185');
+    const discord = request.agent(app).set('X-Forwarded-For', '198.51.100.186');
+    const stateA = await start(google, 'google');
+    const callbackA = await google.get('/api/v1/auth/google/callback').query({ state: stateA, code: 'test-code' });
+    const sessionA = (callbackA.headers['set-cookie'] as unknown as string[]).find(cookie => /^ovelo_session=[a-f0-9]{64};/.test(cookie))!.split(';')[0]!;
+    const receipt = (await google.get('/api/v1/auth/oauth/result')).body;
+    expect(receipt.data.user.email).toBe(googleEmail);
+    // Retry/StrictMode is safe and idempotent, without manufacturing a session.
+    expect((await google.get('/api/v1/auth/oauth/result')).body).toEqual(receipt);
+    const stateB = await start(discord, 'discord');
+    const callback = await discord.get('/api/v1/auth/discord/callback').query({ state: stateB, code: 'test-code' });
+    const ticket = (callback.headers['set-cookie'] as unknown as string[]).find(cookie => cookie.startsWith('ovelo_oauth_result='))!.split(';')[0]!;
+    expect((await discord.get('/api/v1/auth/oauth/result')).body.data.user.email).toBe(discordEmail);
+    // A completion receipt can never authorize another user or a cookie-less browser.
+    const mismatched = await request(app).get('/api/v1/auth/oauth/result').set('Cookie', `${sessionA}; ${ticket}`);
+    expect(mismatched.status).toBe(401);
+    expect(mismatched.body.error.code).toBe('OAUTH_SESSION_MISMATCH');
+    expect((await request(app).get('/api/v1/auth/oauth/result').set('Cookie', ticket)).status).toBe(401);
+    const csrf = (await discord.get('/api/v1/auth/csrf')).body.data.csrfToken;
+    await discord.post('/api/v1/auth/logout').set('X-CSRF-Token', csrf);
+    expect((await discord.get('/api/v1/auth/oauth/result').set('Cookie', ticket)).status).toBe(401);
+  });
+  it('does not retain Google identity when Discord fails or needs a separate registration', async () => {
+    const agent = request.agent(app).set('X-Forwarded-For', '198.51.100.187');
+    const originalDiscordId = discordId;
+    try {
+      const stateA = await start(agent, 'google');
+      await agent.get('/api/v1/auth/google/callback').query({ state: stateA, code: 'test-code' });
+      const previous = (await agent.get('/api/v1/auth/sessions')).body.data.find((session: { current: boolean }) => session.current);
+      const failure = await start(agent, 'discord');
+      invalidCode = true;
+      const failed = await agent.get('/api/v1/auth/discord/callback').query({ state: failure, code: 'test-code' });
+      invalidCode = false;
+      expect(failed.headers.location).toContain('OAUTH_FAILED');
+      expect((await agent.get('/api/v1/auth/me')).status).toBe(401);
+      expect(await prisma.session.findUnique({ where: { id: previous.id } })).toBeNull();
+      const retryA = await start(agent, 'google');
+      await agent.get('/api/v1/auth/google/callback').query({ state: retryA, code: 'test-code' });
+      discordId = String(Date.now() + 1900000);
+      const freshDiscord = await start(agent, 'discord');
+      const registration = await agent.get('/api/v1/auth/discord/callback').query({ state: freshDiscord, code: 'test-code' });
+      expect(registration.headers.location).toBe(`${appOrigin}/register?oauth=complete`);
+      expect((await agent.get('/api/v1/auth/me')).status).toBe(401);
+      expect((await agent.get('/api/v1/auth/oauth/pending')).body.data.kind).toBe('register');
+      expect(await prisma.account.findUnique({ where: { provider_providerAccountId: { provider: 'discord', providerAccountId: discordId } } })).toBeNull();
+    } finally {
+      invalidCode = false;
+      discordId = originalDiscordId;
+    }
   });
   it('requires current consent for a legacy provider identity and consumes the consent ticket once', async () => {
     const userB = await prisma.user.findUniqueOrThrow({ where: { email: discordEmail } });
@@ -500,7 +551,7 @@ describe.skipIf(process.env.RUN_DB_TESTS !== 'true')('production authentication 
     expect(
       (await agent.get('/api/v1/auth/discord/callback').query({ state: stateB, code: 'test-code' }))
         .headers.location,
-    ).toBe(`${appOrigin}/dashboard`);
+    ).toBe(`${appOrigin}/auth/complete`);
     expect((await agent.get('/api/v1/auth/me')).body.data.user.email).toBe(discordEmail);
     expect((await agent.get('/api/v1/admin/me')).body.data.email).toBe(adminEmail);
     expect(await prisma.session.findUnique({ where: { id: before.id } })).toBeNull();
@@ -509,7 +560,7 @@ describe.skipIf(process.env.RUN_DB_TESTS !== 'true')('production authentication 
     const agent = request.agent(app).set('X-Forwarded-For', '198.51.100.181');
     expect((await agent.post('/api/v1/auth/login').send({ email, password })).status).toBe(200);
     const csrf = (await agent.get('/api/v1/auth/csrf')).body.data.csrfToken;
-    const link = await agent.post('/api/v1/auth/discord/link').set('X-CSRF-Token', csrf);
+    const link = await agent.post('/api/v1/auth/discord/link').set('X-CSRF-Token', csrf).send({ intent: 'link-account' });
     const state = new URL(link.body.data.url).searchParams.get('state')!;
     expect((await agent.post('/api/v1/auth/logout').set('X-CSRF-Token', csrf)).status).toBe(204);
     const redis = await (await import('../src/config/redis.js')).ensureRedis();
@@ -560,7 +611,10 @@ describe.skipIf(process.env.RUN_DB_TESTS !== 'true')('production authentication 
     await agent.post('/api/v1/auth/login').send({ email, password, ...consent });
     expect((await agent.post('/api/v1/auth/discord/link')).status).toBe(403);
     const csrf = (await agent.get('/api/v1/auth/csrf')).body.data.csrfToken;
-    const linked = await agent.post('/api/v1/auth/discord/link').set('X-CSRF-Token', csrf);
+    const unconfirmed = await agent.post('/api/v1/auth/discord/link').set('X-CSRF-Token', csrf);
+    expect(unconfirmed.status).toBe(400);
+    expect(unconfirmed.body.error.code).toBe('ACCOUNT_LINK_CONFIRMATION_REQUIRED');
+    const linked = await agent.post('/api/v1/auth/discord/link').set('X-CSRF-Token', csrf).send({ intent: 'link-account' });
     expect(linked.status).toBe(200);
     const state = new URL(linked.body.data.url).searchParams.get('state');
     expect(
@@ -580,7 +634,7 @@ describe.skipIf(process.env.RUN_DB_TESTS !== 'true')('production authentication 
     for (const agent of [first, second])
       expect((await agent.post('/api/v1/auth/login').send({ email, password })).status).toBe(200);
     const csrf = (await first.get('/api/v1/auth/csrf')).body.data.csrfToken;
-    const linked = await first.post('/api/v1/auth/discord/link').set('X-CSRF-Token', csrf);
+    const linked = await first.post('/api/v1/auth/discord/link').set('X-CSRF-Token', csrf).send({ intent: 'link-account' });
     const state = new URL(linked.body.data.url).searchParams.get('state')!;
     expect(
       (
@@ -628,7 +682,7 @@ describe.skipIf(process.env.RUN_DB_TESTS !== 'true')('production authentication 
       expect(
         (await agent.get(`/api/v1/auth/${provider}/callback`).query({ state, code: 'test-code' }))
           .headers.location,
-      ).toBe(`${appOrigin}/dashboard`);
+      ).toBe(`${appOrigin}/auth/complete`);
       expect((await agent.get('/api/v1/auth/me')).status).toBe(200);
       expect((await agent.get('/api/v1/auth/me')).status).toBe(200);
       const csrf = await agent.get('/api/v1/auth/csrf');

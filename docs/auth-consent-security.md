@@ -8,6 +8,7 @@
 - Successful sign-in replaces only the same browser's same-kind session, revoking its old database session in the creation transaction. Other devices and the independent normal/admin cookie remain valid. Explicit linking does not create a new login session.
 - Logout is CSRF-protected and revokes the current server session. Pending browser OAuth state/registration/consent tickets are invalidated and cookies cleared. The browser clears private queries and local component state only after successful server logout; failures are shown for retry.
 - Authentication generations ignore stale responses. Identity changes cancel/clear queries and remount private component state. BroadcastChannel, focus/back-forward checks and private API 401 handling refresh other browser views.
+- Normal OAuth returns via `/auth/complete`, which verifies an expiring completion receipt against the exact new live normal session before the browser commits that identity and opens the dashboard. Failed session checks are visible and retryable. Linking from Settings requires explicit `link-account` intent and a confirmation naming the current account; historical unintended provider associations require a separate approved repair. See [account separation incident](oauth-account-separation.md).
 
 ## Versioned policies
 

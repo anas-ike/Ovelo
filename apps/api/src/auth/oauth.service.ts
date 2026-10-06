@@ -4,7 +4,8 @@ import { env } from '../config/env.js';
 import { prisma } from '../database/prisma.js';
 import { AppError } from '../middleware/error.js';
 import { assertEmailAllowed } from './email-policy.service.js';
-import { createSession } from './session.service.js';
+import { createSession, clearSessionCookies, destroySession } from './session.service.js';
+import { saveOAuthResult } from './oauth-result.service.js';
 import { randomToken, hashToken, safeEquals } from '../utils/crypto.js';
 import { ensureRedis, consumeOnce } from '../config/redis.js';
 import { savePendingIdentity, clearPendingOAuth } from './oauth-pending.service.js';
@@ -189,6 +190,11 @@ export async function completeOAuth(
       flow.linkSessionId !== initiatingSessionId)
   )
     throw new AppError(401, 'OAUTH_STATE_INVALID', 'Sign in again before linking an account.');
+  if (!flow.linkUserId && !flow.adminLogin) {
+    // A failed/new-account/consent handoff must not retain a previous identity.
+    if (currentSessionId) await destroySession(currentSessionId, response);
+    else clearSessionCookies(response);
+  }
   const identity = await providers[provider].exchange(code, flow.verifier, flow.nonce);
   const account = await prisma.account.findUnique({
     where: { provider_providerAccountId: { provider, providerAccountId: identity.id } },
@@ -288,5 +294,12 @@ export async function completeOAuth(
     admin: !!flow.adminLogin,
     replaceSessionId: initiatingSessionId,
   });
-  return flow.adminLogin ? { adminUrl: await adminEntryUrl(sessionId) } : ('dashboard' as const);
+  if (flow.adminLogin) return { adminUrl: await adminEntryUrl(sessionId) };
+  try {
+    await saveOAuthResult(userId, sessionId, response);
+  } catch (error) {
+    await destroySession(sessionId, response);
+    throw error;
+  }
+  return 'auth/complete' as const;
 }

@@ -14,10 +14,11 @@ export function OAuthButtons({ mode = 'sign-in' }: { mode?: 'sign-in' | 'link' }
     staleTime: 60000,
   });
   async function link(provider: string) {
+    if (!user || !window.confirm(`Connect ${provider === 'google' ? 'Google' : 'Discord'} to ${user.email}? This will let that provider sign in to this same Ovelo account. To keep the accounts separate, cancel and use Sign out instead.`)) return;
     setLinking(true);
     setError('');
     try {
-      const result = await post<{ data: { url: string } }>(`/auth/${provider}/link`);
+      const result = await post<{ data: { url: string } }>(`/auth/${provider}/link`, { intent: 'link-account' });
       window.location.assign(result.data.url);
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Could not connect this provider.');

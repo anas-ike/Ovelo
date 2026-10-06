@@ -16,6 +16,7 @@ import { get, post } from '../../lib/api';
 type AuthContext = {
   user: UserProfile | null;
   loading: boolean;
+  sessionError: string | null;
   login: (
     email: string,
     password: string,
@@ -23,11 +24,13 @@ type AuthContext = {
   ) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
+  confirmProviderSignIn: () => Promise<void>;
 };
 const Context = createContext<AuthContext | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [sessionError, setSessionError] = useState<string | null>(null);
   const location = useLocation();
   const queryClient = useQueryClient();
   const checked = useRef(false);
@@ -35,7 +38,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const identity = useRef<string | null>(null);
   const mutating = useRef(false);
   const channel = useRef<BroadcastChannel | null>(null);
-  const publicPage = ['/', '/how-it-works', '/terms', '/privacy', '/consent'].includes(location.pathname);
+  const publicPage = ['/', '/how-it-works', '/terms', '/privacy', '/consent', '/auth/complete'].includes(location.pathname);
   const refresh = useCallback(async () => {
     if (mutating.current) return;
     const current = ++request.current;
@@ -44,16 +47,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (current === request.current) {
         if (identity.current && identity.current !== result.data.user.id) queryClient.clear();
         identity.current = result.data.user.id;
+        setSessionError(null);
         setUser(result.data.user);
       }
-    } catch {
+    } catch (error) {
       if (current === request.current) {
         if (identity.current) queryClient.clear();
         identity.current = null;
         setUser(null);
+        setSessionError((error as Error & { status?: number }).status === 401 ? null : error instanceof Error ? error.message : 'Unable to verify your session. Please retry.');
       }
     } finally {
       if (current === request.current) setLoading(false);
+    }
+  }, [queryClient]);
+  const confirmProviderSignIn = useCallback(async () => {
+    mutating.current = true;
+    const current = ++request.current;
+    try {
+      const result = await get<{ data: { user: UserProfile } }>('/auth/oauth/result');
+      if (current !== request.current) throw new Error('Another sign-in changed this session. Start sign-in again.');
+      await queryClient.cancelQueries();
+      if (current !== request.current) throw new Error('Another sign-in changed this session. Start sign-in again.');
+      queryClient.clear();
+      identity.current = result.data.user.id;
+      setSessionError(null);
+      checked.current = true;
+      setUser(result.data.user);
+      setLoading(false);
+      channel.current?.postMessage('identity-changed');
+    } catch (error) {
+      if (current === request.current) {
+        identity.current = null;
+        queryClient.clear();
+        setUser(null);
+        setLoading(false);
+      }
+      throw error;
+    } finally {
+      mutating.current = false;
     }
   }, [queryClient]);
   useEffect(() => {
@@ -61,6 +93,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ++request.current;
       identity.current = null;
       setUser(null);
+      setSessionError(null);
       queryClient.clear();
       checked.current = false;
       if (!publicPage) {
@@ -100,8 +133,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AuthContext>(
     () => ({
       user,
+      sessionError,
       loading: loading || (!publicPage && !checked.current),
       refresh,
+      confirmProviderSignIn,
       login: async (email, password, consent) => {
         mutating.current = true;
         const current = ++request.current;
@@ -117,6 +152,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           identity.current = result.data.user.id;
           checked.current = true;
           setUser(result.data.user);
+          setSessionError(null);
           setLoading(false);
           channel.current?.postMessage('identity-changed');
         } finally {
@@ -133,6 +169,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           queryClient.clear();
           identity.current = null;
           setUser(null);
+          setSessionError(null);
           setLoading(false);
           checked.current = true;
           channel.current?.postMessage('identity-changed');
@@ -141,7 +178,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       },
     }),
-    [user, loading, publicPage, queryClient, refresh],
+    [user, sessionError, loading, publicPage, queryClient, refresh, confirmProviderSignIn],
   );
   return (
     <Context.Provider value={value}>

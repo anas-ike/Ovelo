@@ -9,7 +9,7 @@ import { useAuth } from '../../features/auth/AuthProvider';
 
 export function PolicyConsent() {
   const navigate = useNavigate();
-  const { refresh } = useAuth();
+  const { refresh, confirmProviderSignIn } = useAuth();
   const [params] = useSearchParams();
   const source = params.get('source') === 'oauth' ? 'oauth' : 'login';
   const pending = useQuery({
@@ -29,7 +29,8 @@ export function PolicyConsent() {
         termsVersion: policyVersions.terms,
         privacyVersion: policyVersions.privacy,
       });
-      await refresh();
+      if (source === 'oauth') await confirmProviderSignIn();
+      else await refresh();
       const next = params.get('next');
       navigate(next && next.startsWith('/') && !next.startsWith('//') && !next.includes('\\') ? next : '/dashboard', { replace: true });
     } catch (cause) {

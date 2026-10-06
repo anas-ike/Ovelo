@@ -4,6 +4,7 @@ import { env } from '../config/env.js';
 import { ensureRedis, consumeOnce } from '../config/redis.js';
 import { randomToken, hashToken } from '../utils/crypto.js';
 import { AppError } from '../middleware/error.js';
+import { clearOAuthResult, oauthResultCookie } from './oauth-result.service.js';
 
 export const pendingCookie = 'ovelo_oauth_pending';
 const identitySchema = z
@@ -56,6 +57,7 @@ export async function clearPendingOAuth(
   cookies: Record<string, unknown> | undefined,
   response: Response,
 ) {
+  await clearOAuthResult(cookies?.[oauthResultCookie], response);
   const redis = await ensureRedis();
   for (const [cookie, prefix] of [
     ['ovelo_oauth_state', 'ovelo:oauth:'],

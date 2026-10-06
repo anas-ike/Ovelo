@@ -8,6 +8,7 @@ Date: 2026-10-06
 
 ### Findings and remediation
 
+- The approved historical Discord-link repair and exact-session OAuth completion changes are detailed in [the account separation incident report](oauth-account-separation.md). Google and Discord had been linked to one account before the sign-in/linking fix; that unwanted Discord association was removed without moving or deleting ownership records. Live Google retry remains required.
 - Provider identities were already keyed by `(provider, providerAccountId)` with explicit email-conflict linking. The reproduced frontend risk was automatic conversion of login/signup provider controls into account-linking controls when cached user state remained present. The sign-in pages now always start sign-in; Settings explicitly starts linking, bound to both user and initiating session.
 - The browser previously retained private queries after logout, and in-flight authentication responses could restore stale identity. Response generation checks, query cancellation/clearing, identity-keyed private component remounts, cross-tab signals and focus/expiry checks now enforce the browser boundary. Failed server logout retains a visible error instead of falsely reporting success.
 - Password/OAuth login rotates the replaced same-kind browser session atomically. Normal/admin sessions remain separate. Explicit linking keeps its initiating session. Logout invalidates pending OAuth transactions and clears their host-only cookies.
@@ -19,11 +20,11 @@ Date: 2026-10-06
 
 ### Available evidence
 
-- Dedicated disposable PostgreSQL/Redis API tests: **PASS — 75 tests passed, none skipped**, using serial Vitest workers, secure test-only database/cache, migrations and seeded plans.
-- Isolated real Chromium: **10 workflow groups passed**, including delayed `/auth/me` after logout, sign-in/link separation, Google A → logout → Discord B, SPA email identity/query-cache changes, cross-tab logout, unchecked consent and current-version suppression, server pagination, mobile admin create/error recovery, HTTP 404 and no uncaught page errors.
+- Dedicated disposable PostgreSQL/Redis API tests: **PASS — 77 tests passed, none skipped**, using serial Vitest workers, secure test-only database/cache, migrations and seeded plans.
+- Isolated real Chromium: **11 workflow groups passed**, including exact OAuth session confirmation and missing-cookie error/retry, delayed `/auth/me` after logout, sign-in/link separation, Google A → logout → Discord B, SPA email identity/query-cache changes, cross-tab logout, unchecked consent and current-version suppression, server pagination, mobile admin create/error recovery, HTTP 404 and no uncaught page errors.
 - Responsive admin audit: **72 checks**, nine sections at 320, 360, 375, 390, 412, 768, 1024 and 1440px; no horizontal overflow, one H1, dialog overflow and Escape handling.
 - Provider token exchanges/browser provider screens and SMTP failures were simulated; database sessions, Redis state, Google JWT verification, private-record checks and the built app were real. Test services were disposable; production records were not used by tests.
-- Root tests: **PASS — 11 tests**. Default API suite: **PASS — 37 passed, 38 intentionally skipped without disposable services**.
+- Root tests: **PASS — 11 tests**. Default API suite: **PASS — 37 passed, 40 intentionally skipped without disposable services**.
 - Build/typecheck/lint: **PASS**. `npm audit --omit=dev`: **0 vulnerabilities**. `git diff --check`: **PASS**. Focused secret scan: **PASS — no candidates**; `.env` is ignored and untracked.
 - Repository-wide format check: **FAIL — repository-wide Prettier drift remains (78 files reported); unrelated files were not mass-reformatted.**
 - Production deployment/restart/public probes: **PASS — v0.4.0 fix tree deployed; API health 200, web/API/worker started, unchanged ports, HTTPS redirects/HSTS, `/consent`, public routes, noindex/private cache boundary, sitemap, robots, favicon, OG image, CORS and real 404**.

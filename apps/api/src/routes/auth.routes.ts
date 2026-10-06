@@ -7,6 +7,7 @@ import {
   googleCallback,
   googleStart,
   providerCapabilities,
+  providerResult,
   pendingProvider,
   consentProvider,
   linkProvider,
@@ -45,6 +46,7 @@ authRouter.post(
   acceptPoliciesController,
 );
 authRouter.get('/oauth/pending', pendingProvider);
+authRouter.get('/oauth/result', providerResult);
 authRouter.post('/oauth/consent', rateLimit('oauth-consent', 5), consentProvider);
 authRouter.get('/csrf', requireAuth, csrfTokenController);
 authRouter.post('/:provider/link', requireAuth, csrf, rateLimit('oauth-link', 10), linkProvider);

@@ -9,6 +9,7 @@ import { SeoHead } from './components/SeoHead';
 import { NotFound } from './pages/NotFound';
 const Login = lazy(() => import('./pages/auth/Login').then((m) => ({ default: m.Login })));
 const Register = lazy(() => import('./pages/auth/Register').then((m) => ({ default: m.Register })));
+const OAuthComplete = lazy(() => import('./pages/auth/OAuthComplete').then((m) => ({ default: m.OAuthComplete })));
 const PolicyConsent = lazy(() => import('./pages/auth/PolicyConsent').then((m) => ({ default: m.PolicyConsent })));
 const VerifyEmail = lazy(() =>
   import('./pages/auth/VerifyEmail').then((m) => ({ default: m.VerifyEmail })),
@@ -64,6 +65,7 @@ export function App() {
           <Route path="/privacy" element={<PublicInfo kind="privacy" />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/auth/complete" element={<OAuthComplete />} />
           <Route path="/consent" element={<PolicyConsent />} />
           <Route path="/verify-email" element={<VerifyEmail />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
