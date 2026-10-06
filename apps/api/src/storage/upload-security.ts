@@ -3,7 +3,13 @@ import { PDFArray, PDFDict, PDFDocument, PDFName, type PDFObject } from 'pdf-lib
 import { env } from '../config/env.js';
 import { AppError } from '../middleware/error.js';
 import { checksum } from './storage-manager.js';
-import { scanFile } from './virus-scanner.js';
+import { scanFile, type ScannerResult, type ScannerStatus } from './virus-scanner.js';
+
+export class UploadSecurityError extends AppError {
+  constructor(status: number, code: string, message: string, public readonly scannerStatus: ScannerStatus) {
+    super(status, code, message);
+  }
+}
 
 export async function validateUpload(file: { buffer: Buffer; originalname: string; size: number }) {
   const size = file.buffer.length;
@@ -73,7 +79,6 @@ export async function validateUpload(file: { buffer: Buffer; originalname: strin
       if (error instanceof AppError) throw error;
       throw new AppError(415, 'PDF_INVALID', 'This PDF could not be validated.');
     }
-    await scanFile(b);
     body = b;
     mimeType = 'application/pdf';
   } else {
@@ -88,6 +93,16 @@ export async function validateUpload(file: { buffer: Buffer; originalname: strin
       throw new AppError(415, 'IMAGE_INVALID', 'This image could not be validated.');
     }
   }
+  const scan: ScannerResult = (await scanFile(body)) ?? { status: 'NOT_CONFIGURED' };
+  if (scan.status === 'INFECTED')
+    throw new UploadSecurityError(415, 'MALWARE_DETECTED', 'This file failed security validation.', scan.status);
+  if (scan.status !== 'CLEAN' && env.CLAMAV_REQUIRED)
+    throw new UploadSecurityError(
+      503,
+      scan.status === 'ERROR' ? 'SCAN_FAILED' : 'SCANNER_UNAVAILABLE',
+      'File security scanning is currently unavailable.',
+      scan.status,
+    );
   if (body.length > env.MAX_UPLOAD_SIZE)
     throw new AppError(413, 'FILE_TOO_LARGE', 'The processed file exceeds the upload limit.');
   return {
@@ -96,5 +111,6 @@ export async function validateUpload(file: { buffer: Buffer; originalname: strin
     body,
     checksum: checksum(body),
     size: body.length,
+    scannerStatus: scan.status,
   };
 }

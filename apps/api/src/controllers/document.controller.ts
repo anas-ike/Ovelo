@@ -1,10 +1,12 @@
 import type { Request } from 'express';
 import { asyncHandler } from '../utils/async-handler.js';
 import { AppError } from '../middleware/error.js';
-import { validateUpload } from '../storage/upload-security.js';
+import { UploadSecurityError, validateUpload } from '../storage/upload-security.js';
+import type { ScannerStatus } from '../storage/virus-scanner.js';
 import { uploadDocument, downloadDocument, deleteDocument } from '../services/document.service.js';
 import { prisma } from '../database/prisma.js';
 import { assertItem } from '../services/item-records.service.js';
+import { logger } from '../utils/logger.js';
 const kinds = new Set([
   'RECEIPT',
   'WARRANTY',
@@ -14,6 +16,17 @@ const kinds = new Set([
   'PURCHASE',
   'OTHER',
 ]);
+async function recordUploadSecurityEvent(userId: string, type: string, requestId: string | undefined) {
+  const fields = { userId, requestId, type };
+  if (type.includes('REJECTED')) logger.warn(fields, 'Upload security event');
+  else logger.info(fields, 'Upload security event');
+  await prisma.securityEvent.create({ data: { userId, type } }).catch(() => {
+    logger.warn(fields, 'Upload security event could not be recorded');
+  });
+}
+function scannerEventStatus(status: ScannerStatus) {
+  return `SCANNER_${status}`;
+}
 export const createDocument = asyncHandler(async (req, res) => {
   const file = (req as Request & { file?: Express.Multer.File }).file;
   if (!file) throw new AppError(400, 'FILE_REQUIRED', 'Select a file to upload.');
@@ -25,15 +38,29 @@ export const createDocument = asyncHandler(async (req, res) => {
     .trim()
     .slice(0, 200);
   if (!title) throw new AppError(400, 'INVALID_TITLE', 'Document title is required.');
-  res.status(201).json({
-    data: await uploadDocument(
-      req.auth!.userId,
-      String(req.params.id),
-      await validateUpload(file),
-      kind as never,
-      title,
-    ),
-  });
+  let validated;
+  try {
+    validated = await validateUpload(file);
+  } catch (error) {
+    const type = error instanceof UploadSecurityError
+      ? `UPLOAD_REJECTED_${scannerEventStatus(error.scannerStatus)}`
+      : 'UPLOAD_REJECTED_VALIDATION_FAILED';
+    await recordUploadSecurityEvent(req.auth!.userId, type, res.locals.requestId);
+    throw error;
+  }
+  const document = await uploadDocument(
+    req.auth!.userId,
+    String(req.params.id),
+    validated,
+    kind as never,
+    title,
+  );
+  await recordUploadSecurityEvent(
+    req.auth!.userId,
+    `UPLOAD_ACCEPTED_${scannerEventStatus(validated.scannerStatus)}`,
+    res.locals.requestId,
+  );
+  res.status(201).json({ data: document });
 });
 export const getDocument = asyncHandler(async (req, res) => {
   const document = await downloadDocument(req.auth!.userId, String(req.params.documentId));

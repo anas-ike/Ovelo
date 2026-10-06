@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import argon2 from 'argon2';
 import sharp from 'sharp';
+import PDFDocument from 'pdfkit';
 import { randomUUID, createHmac } from 'node:crypto';
 import { app } from '../src/app.js';
 import { prisma } from '../src/database/prisma.js';
@@ -9,6 +10,17 @@ import { hashToken, randomToken } from '../src/utils/crypto.js';
 import { provisionMainAdmin } from '../src/auth/main-admin.service.js';
 import { env } from '../src/config/env.js';
 import { policyVersions } from '@ovelo/validation';
+
+async function pdfFixture() {
+  const document = new PDFDocument();
+  const chunks: Buffer[] = [];
+  document.on('data', (chunk: Buffer) => chunks.push(chunk));
+  const complete = new Promise<void>((resolve) => document.on('end', resolve));
+  document.text('optional scanner upload test');
+  document.end();
+  await complete;
+  return Buffer.concat(chunks);
+}
 
 describe.skipIf(process.env.RUN_DB_TESTS !== 'true')(
   'ownership records and administrator security',
@@ -188,6 +200,11 @@ describe.skipIf(process.env.RUN_DB_TESTS !== 'true')(
         .attach('file', image, 'coverage.png');
       expect(uploaded.status).toBe(201);
       documentId = uploaded.body.data.id;
+      expect(
+        await prisma.securityEvent.findFirst({
+          where: { userId: userA, type: 'UPLOAD_ACCEPTED_SCANNER_NOT_CONFIGURED' },
+        }),
+      ).not.toBeNull();
       expect((await a.get('/api/v1/auth/policies')).body.data.accepted.uploadProcessing).toBe(true);
       expect((await a.get(`/api/v1/items/${itemId}/documents`)).body.data).toHaveLength(1);
       expect(
@@ -208,6 +225,8 @@ describe.skipIf(process.env.RUN_DB_TESTS !== 'true')(
           (l: { id: string }) => l.id === locationId,
         ),
       ).toBe(false);
+      const documentCount = await prisma.document.count({ where: { itemId } });
+      const storageCount = await prisma.storageObject.count({ where: { userId: userA, deletedAt: null } });
       expect(
         (
           await a
@@ -216,6 +235,26 @@ describe.skipIf(process.env.RUN_DB_TESTS !== 'true')(
             .attach('file', Buffer.from('executable'), 'unsafe.js')
         ).status,
       ).toBe(415);
+      expect(await prisma.document.count({ where: { itemId } })).toBe(documentCount);
+      expect(await prisma.storageObject.count({ where: { userId: userA, deletedAt: null } })).toBe(storageCount);
+      expect(
+        await prisma.securityEvent.findFirst({
+          where: { userId: userA, type: 'UPLOAD_REJECTED_VALIDATION_FAILED' },
+        }),
+      ).not.toBeNull();
+      const pdf = await pdfFixture();
+      const pdfUpload = await a
+        .post(`/api/v1/items/${itemId}/documents`)
+        .set('X-CSRF-Token', csrfA)
+        .field('kind', 'OTHER')
+        .attach('file', pdf, 'manual.pdf');
+      expect(pdfUpload.status).toBe(201);
+      expect(pdfUpload.body.data.storageObject.mimeType).toBe('application/pdf');
+      expect(
+        await prisma.securityEvent.findFirst({
+          where: { userId: userA, type: 'UPLOAD_ACCEPTED_SCANNER_NOT_CONFIGURED' },
+        }),
+      ).not.toBeNull();
     });
     it('persists warranty/repair CRUD and exact activity while rejecting IDOR attachments and record IDs', async () => {
       const w = await a

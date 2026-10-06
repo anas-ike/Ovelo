@@ -50,6 +50,10 @@ const raw = z.object({
   MAX_UPLOAD_SIZE: number.default(26214400),
   MAX_IMAGE_SIZE: number.default(10485760),
   MAX_DOCUMENT_SIZE: number.default(26214400),
+  CLAMAV_ENABLED: boolean.default(true),
+  CLAMAV_REQUIRED: boolean.default(false),
+  CLAMAV_HOST: z.string().optional(),
+  CLAMAV_PORT: number.default(3310),
   SESSION_COOKIE_NAME: z
     .string()
     .regex(/^[a-zA-Z0-9_]+$/)

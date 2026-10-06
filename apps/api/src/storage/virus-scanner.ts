@@ -1,29 +1,31 @@
 import net from 'node:net';
-import { AppError } from '../middleware/error.js';
-export async function scanFile(body: Buffer) {
-  const host = process.env.CLAMAV_HOST;
-  if (!host)
-    throw new AppError(
-      503,
-      'SCANNER_UNAVAILABLE',
-      'PDF scanning is not configured. Contact the administrator.',
-    );
-  await new Promise<void>((resolve, reject) => {
-    const socket = net.createConnection({ host, port: Number(process.env.CLAMAV_PORT ?? 3310) });
+import { env } from '../config/env.js';
+
+export type ScannerStatus = 'CLEAN' | 'INFECTED' | 'UNAVAILABLE' | 'ERROR' | 'NOT_CONFIGURED';
+export type ScannerResult = { status: ScannerStatus };
+
+export async function scanFile(body: Buffer): Promise<ScannerResult> {
+  if (!env.CLAMAV_ENABLED || !env.CLAMAV_HOST) return { status: 'NOT_CONFIGURED' };
+  return new Promise((resolve) => {
+    const socket = net.createConnection({ host: env.CLAMAV_HOST, port: env.CLAMAV_PORT });
     let response = '';
-    socket.setTimeout(30000, () => socket.destroy(new Error('scanner timeout')));
-    socket.on('error', () =>
-      reject(new AppError(503, 'SCANNER_UNAVAILABLE', 'File scanning is unavailable.')),
-    );
+    let settled = false;
+    const finish = (result: ScannerResult) => {
+      if (settled) return;
+      settled = true;
+      socket.destroy();
+      resolve(result);
+    };
+    socket.setTimeout(30000, () => finish({ status: 'UNAVAILABLE' }));
+    socket.on('error', () => finish({ status: 'UNAVAILABLE' }));
     socket.on('data', (data) => {
       response += data.toString();
-      if (response.length > 4096) socket.destroy(new Error('invalid scanner response'));
+      if (response.length > 4096) finish({ status: 'ERROR' });
     });
     socket.on('end', () => {
-      if (response.includes('FOUND'))
-        reject(new AppError(415, 'MALWARE_DETECTED', 'This file failed the security scan.'));
-      else if (response.includes(': OK')) resolve();
-      else reject(new AppError(503, 'SCAN_FAILED', 'The security scan could not be completed.'));
+      if (response.includes('FOUND')) finish({ status: 'INFECTED' });
+      else if (response.includes(': OK')) finish({ status: 'CLEAN' });
+      else finish({ status: 'ERROR' });
     });
     socket.on('connect', () => {
       socket.write('zINSTREAM\0');

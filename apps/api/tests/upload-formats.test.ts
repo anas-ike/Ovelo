@@ -27,12 +27,14 @@ describe('upload format boundaries', () => {
     const buffer = await make();
     const result = await validateUpload({ buffer, size: buffer.length, originalname: `valid.${extension}` });
     expect(result.mimeType).toBe('image/webp');
+    expect(result.scannerStatus).toBe('NOT_CONFIGURED');
   });
 
   it('accepts a valid PDF when the scanner reports clean', async () => {
     const buffer = await pdfFixture();
     const result = await validateUpload({ buffer, size: buffer.length, originalname: 'valid.pdf' });
     expect(result.mimeType).toBe('application/pdf');
+    expect(result.scannerStatus).toBe('NOT_CONFIGURED');
   });
 
   it('rejects corrupt images with an image-specific error', async () => {

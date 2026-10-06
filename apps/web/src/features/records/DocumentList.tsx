@@ -60,7 +60,7 @@ export function DocumentList({
           <div className="upload-acknowledgement">{uploadConsent.acknowledgement}</div>
           <Field
             label={busy ? 'Uploading…' : 'Upload document'}
-            hint="JPG, PNG, WEBP, PDF. PDFs require the configured malware scanner."
+            hint="JPG, PNG, WEBP, PDF. Strict file validation always applies; optional malware scanning is used when configured."
           >
             <Input
               disabled={busy || !uploadConsent.ready}

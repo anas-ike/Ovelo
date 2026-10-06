@@ -13,26 +13,26 @@ Date: 2026-10-06
 - Password/OAuth login rotates the replaced same-kind browser session atomically. Normal/admin sessions remain separate. Explicit linking keeps its initiating session. Logout invalidates pending OAuth transactions and clears their host-only cookies.
 - Versioned Terms/Privacy acknowledgements are required before account creation or the next applicable sign-in; provider-only legacy users have a single-use pending consent step. Current upload processing acknowledgement is checked before multipart parsing and storage. Acceptance records contain policy, version and timestamp, with history retained and included in account exports.
 - Manual and existing-account OAuth consent now use a dedicated `/consent` route backed by single-use, purpose-bound Redis tickets. Registration mode is derived from the server-side pending identity rather than a URL query, and administrator OAuth errors remain on the administrator login surface.
-- Upload validation structurally parses PDFs, rejects active/embedded content with a specific error, reports corrupt images/PDFs separately, and preserves fail-closed scanner-unavailable behavior. Valid JPG, PNG, WEBP and structurally valid PDF fixtures pass the focused format boundary tests.
+- Upload validation structurally parses PDFs, rejects active/embedded content with a specific error, reports corrupt images/PDFs separately, and treats ClamAV as an optional additional malware layer. Valid JPG, PNG, WEBP and structurally valid PDF fixtures pass without ClamAV; scanner `CLEAN`, `INFECTED`, `UNAVAILABLE`, `ERROR` and `NOT_CONFIGURED` states are tested separately.
 - Administrator records have bounded server pagination/search, stable ordering, narrow-screen navigation/cards/forms, accessible pagination, and visible modal errors. Missing administrator configuration has a distinct recovery response; individual mismatches and delivery failures still receive the same generic acknowledgement.
 - Unknown public HTML routes return a branded HTTP 404; private HTML and admin redirects have no-store/noindex headers. Existing ownership, CSRF, rate-limit, password and upload-scan safeguards remain in place.
 
 ### Available evidence
 
-- Dedicated disposable PostgreSQL/Redis API tests: **PASS — 66 tests passed, none skipped**, using serial Vitest workers, secure test-only database/cache, migrations and seeded plans.
+- Dedicated disposable PostgreSQL/Redis API tests: **PASS — 75 tests passed, none skipped**, using serial Vitest workers, secure test-only database/cache, migrations and seeded plans.
 - Isolated real Chromium: **10 workflow groups passed**, including delayed `/auth/me` after logout, sign-in/link separation, Google A → logout → Discord B, SPA email identity/query-cache changes, cross-tab logout, unchecked consent and current-version suppression, server pagination, mobile admin create/error recovery, HTTP 404 and no uncaught page errors.
 - Responsive admin audit: **72 checks**, nine sections at 320, 360, 375, 390, 412, 768, 1024 and 1440px; no horizontal overflow, one H1, dialog overflow and Escape handling.
 - Provider token exchanges/browser provider screens and SMTP failures were simulated; database sessions, Redis state, Google JWT verification, private-record checks and the built app were real. Test services were disposable; production records were not used by tests.
-- Root tests: **PASS — 11 tests**. Default API suite: **PASS — 28 passed, 38 intentionally skipped without disposable services**.
+- Root tests: **PASS — 11 tests**. Default API suite: **PASS — 37 passed, 38 intentionally skipped without disposable services**.
 - Build/typecheck/lint: **PASS**. `npm audit --omit=dev`: **0 vulnerabilities**. `git diff --check`: **PASS**. Focused secret scan: **PASS — no candidates**; `.env` is ignored and untracked.
-- Repository-wide format check: **FAIL — repository-wide Prettier drift remains (76 files reported); unrelated files were not mass-reformatted.**
+- Repository-wide format check: **FAIL — repository-wide Prettier drift remains (78 files reported); unrelated files were not mass-reformatted.**
 - Production deployment/restart/public probes: **PASS — v0.4.0 fix tree deployed; API health 200, web/API/worker started, unchanged ports, HTTPS redirects/HSTS, `/consent`, public routes, noindex/private cache boundary, sitemap, robots, favicon, OG image, CORS and real 404**.
 - Production public Chromium: **PASS — 28 page/width checks at 320, 390, 768 and 1440px; no overflow, no multiple H1s and no uncaught page errors**.
 - Build output: CSS 42.14 KB; largest emitted JS chunks 416.51 KB and 347.41 KB; OG image 41.5 KB. Public probe response times were 9–218 ms in this environment. LCP/CLS/INP were not measured; Lighthouse is unavailable and no score is claimed.
 
 ### External status and publication
 
-Successful live Google/Discord consent and production authenticated feature checks remain blocked without an authorized browser/account. A production metadata-only query observed **1 active administrator, 1 primary administrator and 2 active users**; no administrator password was printed or used. The public recovery probe for an unknown email returned the generic `{ accepted: true }` response, so it did not enumerate the address. Full credentialed recovery delivery remains blocked by the previously observed SMTP `EAUTH`; absent ClamAV and unconfigured optional Places remain operator follow-ups. No provider success, email delivery, PDF upload success, Lighthouse score or Search Console verification is claimed.
+Successful live Google/Discord consent and production authenticated feature checks remain blocked without an authorized browser/account. A production metadata-only query observed **1 active administrator, 1 primary administrator and 2 active users**; no administrator password was printed or used. The public recovery probe for an unknown email returned the generic `{ accepted: true }` response, so it did not enumerate the address. Full credentialed recovery delivery remains blocked by the previously observed SMTP `EAUTH`; optional ClamAV is not configured and optional Places remains an operator follow-up. No provider success, email delivery, authenticated production upload, Lighthouse score or Search Console verification is claimed. Production strict non-malware validation remains active, and no upload is reported as malware-scanned while ClamAV is unavailable.
 
 Required security/authentication cookies are HttpOnly, Secure in production, host/path scoped, SameSite-configured and backed by server sessions/CSRF hashes. No optional analytics/tracking is configured, so no analytics cookie banner or pre-consent analytics initialization exists. Terms and Privacy are public at `/terms` and `/privacy`, linked from auth and upload consent UI, with current policy version `2026-10-06` recorded server-side.
 
@@ -189,7 +189,7 @@ Diagnostics reproduced intermittent geometric QR detection failures on clean gen
 | Primary administrator provisioning                         | **FAIL — `ADMIN_PASSWORD` does not satisfy existing 16–128-character policy**                                                                       |
 | SMTP connection/authentication                             | **FAIL — configured server reached, authentication rejected with `EAUTH` on `AUTH PLAIN`**                                                          |
 | SMTP recovery delivery / inbox receipt                     | BLOCKED — SMTP authentication failed                                                                                                                |
-| PDF success                                                | BLOCKED — `CLAMAV_HOST` absent; scanning remains fail-closed                                                                                        |
+| PDF success                                                | BLOCKED — no authenticated production upload account was available; optional ClamAV is absent while strict structural validation remains active      |
 | Optional Places API                                        | NOT CONFIGURED — `GOOGLE_MAPS_API_KEY` absent; manual address search/selection and Maps links remain available                                      |
 
 Local verification discovered inherited shell variables taking precedence over `.env`. Real production probes were repeated with `DOTENV_CONFIG_OVERRIDE=true` so the supplied file was authoritative; dedicated tests explicitly kept that override unset. Credential values were never included in reports or tool output.
@@ -198,7 +198,7 @@ Local verification discovered inherited shell variables taking precedence over `
 
 1. Provision the primary owner using a policy-compliant `ADMIN_PASSWORD`, or run **`npm run resetpass`** interactively in the existing production container with the correct `ADMIN_EMAIL`. The command prompts without echo, writes the database, revokes sessions/tickets, and does not modify `.env`.
 2. Correct `SMTP_USER` / `SMTP_PASSWORD` and the provider's SMTP authentication requirements, then repeat connection/authentication and an actual recovery-email/inbox test. Do not paste credentials into reports or chat.
-3. Configure a reachable ClamAV service using `CLAMAV_HOST` / `CLAMAV_PORT` for PDF uploads. Keep fail-closed scanning.
+3. If an additional malware layer is desired, configure `CLAMAV_ENABLED=true`, `CLAMAV_HOST` and `CLAMAV_PORT`. Keep `CLAMAV_REQUIRED=false` for optional scanning, or set it to `true` when fail-closed scanner availability is required.
 4. Use an authorized real browser/account to complete both OAuth consent flows and exercise authenticated production item/admin/recovery/session/logout workflows. Link administrator provider identities explicitly after administrator password login.
 5. `GOOGLE_MAPS_API_KEY` is optional for Places suggestions. Manual addresses and Maps links do not require it.
 
