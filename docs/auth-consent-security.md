@@ -16,7 +16,7 @@
 
 `PolicyConsent` stores `(userId, policy, version, acceptedAt)` and uniquely records each version. It collects no IP address, provider token or document content. History is included in the authenticated account export.
 
-- `POST /auth/register`: requires `termsVersion` and `privacyVersion` to equal current versions before creating an account. Provider registration uses the pending identity cookie and a verified/recovery email flow.
+- `POST /auth/register`: manual email registration requires a password and current `termsVersion`/`privacyVersion`; pending provider identities cannot use it. First-time provider accounts with a verified email use `/auth/oauth/consent` to create the account and exact-session receipt without a password or redundant verification mail. A provider identity lacking verified email uses strict `/auth/oauth/register` without a password and must verify the manually supplied email before authenticating.
 - `POST /auth/login`: validates credentials before returning `428 POLICY_CONSENT_REQUIRED` for missing current acceptance. Required versions can be submitted with the retried login; already accepted versions need no repeated checkbox.
 - Existing provider users missing current policies receive `/consent?source=oauth`; manual password users missing current policies receive `/consent?source=login`. The server determines the pending transaction kind, and the corresponding consent endpoint consumes its expiring, purpose-bound ticket once. These steps create a normal session only and cannot elevate administrator access.
 - `GET /auth/policies`: returns safe versions and this session's current acceptance flags. Public responses contain no account data.
@@ -28,6 +28,8 @@ All acknowledgement controls start unchecked. A client-supplied version is an ex
 ## Administrator operations
 
 Normal cookies cannot authorize `/admin/*`. The host-only web gate remains tied to a live, short-lived administrator database session. Owner-only actions, primary-owner restrictions, audit and session revocation continue to apply.
+
+Password login clears pending OAuth/manual-consent handoffs and returns an explicit administrator destination with the signed `/admin/entry` URL. The browser confirms `/admin/me` and validates that entry's same-origin/path before navigation. Administrator bootstrap and component identity are independent of normal authentication; the console home link stays at `/admin`. Successful administrator login preserves any independent normal-user session.
 
 List endpoints return `{ data, pagination: { page, pageSize, total } }`. Page sizes are bounded to 1–100; search is server-side and stable secondary ID ordering prevents ties. Administrators see only their own audit records unless they are owners.
 

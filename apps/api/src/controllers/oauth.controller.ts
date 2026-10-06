@@ -6,11 +6,26 @@ import { env } from '../config/env.js';
 import { AppError } from '../middleware/error.js';
 import { z } from 'zod';
 import { logger } from '../utils/logger.js';
-import { requireCurrentPolicyConsent } from '../auth/policy-consent.service.js';
+import { assertPolicyVersions, requireCurrentPolicyConsent } from '../auth/policy-consent.service.js';
 import { createSession, destroySession } from '../auth/session.service.js';
 import { prisma } from '../database/prisma.js';
 import { oauthResultCookie, pendingOAuthResult, saveOAuthResult } from '../auth/oauth-result.service.js';
-import { publicUserSelect } from '../auth/auth.service.js';
+import { publicUserSelect, register } from '../auth/auth.service.js';
+import { email, policyConsentSchema } from '@ovelo/validation';
+
+async function createProviderSession(userId: string, req: Request, res: Response) {
+  const sessionId = await createSession(userId, res, {
+    userAgent: req.get('user-agent'),
+    replaceSessionId: req.auth?.sessionId,
+  });
+  try {
+    await saveOAuthResult(userId, sessionId, res);
+  } catch (error) {
+    await destroySession(sessionId, res);
+    throw error;
+  }
+  res.clearCookie(pendingCookie, { path: '/' });
+}
 
 export const providerCapabilities = asyncHandler(async (_req, res) => {
   res.json({ data: oauthCapabilities() });
@@ -29,7 +44,12 @@ export const providerResult = asyncHandler(async (req, res) => {
 export const pendingProvider = asyncHandler(async (req, res) => {
   const identity = await pendingIdentity(req.cookies?.[pendingCookie]);
   res.json({
-    data: { provider: identity?.provider ?? null, email: identity?.email, name: identity?.name, kind: identity ? identity.userId ? 'consent' : 'register' : null },
+    data: {
+      provider: identity?.provider ?? null,
+      email: identity?.email,
+      name: identity?.name,
+      kind: identity ? identity.userId || identity.email ? 'consent' : 'register' : null,
+    },
   });
 });
 export const consentProvider = asyncHandler(async (req, res) => {
@@ -38,8 +58,20 @@ export const consentProvider = asyncHandler(async (req, res) => {
     .strict()
     .parse(req.body);
   const identity = await pendingIdentity(req.cookies?.[pendingCookie]);
-  if (!identity?.userId)
+  if (!identity)
     throw new AppError(400, 'OAUTH_PENDING_EXPIRED', 'Provider sign-in expired. Start again.');
+  if (!identity.userId) {
+    if (!identity.email)
+      throw new AppError(400, 'OAUTH_EMAIL_REQUIRED', 'Add and verify an email address to finish sign-in.');
+    assertPolicyVersions(body, ['TERMS', 'PRIVACY']);
+    await pendingIdentity(req.cookies?.[pendingCookie], true);
+    const user = await register(
+      { name: identity.name || 'Ovelo member', email: identity.email, ...body },
+      identity,
+    );
+    await createProviderSession(user.id, req, res);
+    return res.status(201).json({ data: { authenticated: true } });
+  }
   const account = await prisma.account.findUnique({
     where: {
       provider_providerAccountId: {
@@ -60,18 +92,27 @@ export const consentProvider = asyncHandler(async (req, res) => {
   await requireCurrentPolicyConsent(user.id, body, ['TERMS', 'PRIVACY']);
   await pendingIdentity(req.cookies?.[pendingCookie], true);
   await prisma.securityEvent.create({ data: { userId: user.id, type: 'OAUTH_LOGIN' } });
-  const sessionId = await createSession(user.id, res, {
-    userAgent: req.get('user-agent'),
-    replaceSessionId: req.auth?.sessionId,
-  });
-  try {
-    await saveOAuthResult(user.id, sessionId, res);
-  } catch (error) {
-    await destroySession(sessionId, res);
-    throw error;
+  await createProviderSession(user.id, req, res);
+  res.json({ data: { authenticated: true } });
+});
+export const registerProvider = asyncHandler(async (req, res) => {
+  const body = z
+    .object({ name: z.string().trim().min(1).max(100), email })
+    .merge(policyConsentSchema.pick({ termsVersion: true, privacyVersion: true }))
+    .strict()
+    .parse(req.body);
+  assertPolicyVersions(body, ['TERMS', 'PRIVACY']);
+  const identity = await pendingIdentity(req.cookies?.[pendingCookie]);
+  if (!identity || identity.userId)
+    throw new AppError(400, 'OAUTH_PENDING_EXPIRED', 'Start provider sign-in again.');
+  await pendingIdentity(req.cookies?.[pendingCookie], true);
+  const user = await register(body, identity);
+  if (user.emailVerifiedAt) {
+    await createProviderSession(user.id, req, res);
+    return res.status(201).json({ data: { authenticated: true } });
   }
   res.clearCookie(pendingCookie, { path: '/' });
-  res.json({ data: { authenticated: true } });
+  res.status(201).json({ data: { authenticated: false, verificationRequired: true } });
 });
 export const linkProvider = asyncHandler(async (req, res) => {
   if (req.body?.intent !== 'link-account')

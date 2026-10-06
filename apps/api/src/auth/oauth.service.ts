@@ -244,13 +244,21 @@ export async function completeOAuth(
       { provider, providerAccountId: identity.id, email: identity.email, name: identity.name },
       response,
     );
-    return 'register' as const;
+    return identity.email ? 'consent' as const : 'register' as const;
   }
   const active = await prisma.user.findFirst({
     where: { id: userId, disabledAt: null, deletedAt: null },
-    select: { id: true, emailVerifiedAt: true, role: true },
+    select: { id: true, email: true, emailVerifiedAt: true, role: true },
   });
   if (!active) throw new AppError(403, 'ACCOUNT_UNAVAILABLE', 'This account is unavailable.');
+  if (!active.emailVerifiedAt && identity.email === active.email) {
+    await prisma.$transaction([
+      prisma.user.update({ where: { id: active.id }, data: { emailVerifiedAt: new Date() } }),
+      prisma.emailVerification.deleteMany({ where: { userId: active.id, newEmail: null } }),
+      prisma.securityEvent.create({ data: { userId: active.id, type: 'PROVIDER_EMAIL_VERIFIED' } }),
+    ]);
+    active.emailVerifiedAt = new Date();
+  }
   if (!active.emailVerifiedAt)
     throw new AppError(403, 'EMAIL_NOT_VERIFIED', 'Verify your email before signing in.');
   if (flow.adminLogin && !['ADMIN', 'OWNER'].includes(active.role))

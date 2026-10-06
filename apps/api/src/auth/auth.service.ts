@@ -25,13 +25,15 @@ export async function register(
   input: {
     name: string;
     email: string;
-    password: string;
+    password?: string;
     termsVersion?: string;
     privacyVersion?: string;
   },
   identity?: PendingIdentity | null,
 ) {
   assertPolicyVersions(input, ['TERMS', 'PRIVACY']);
+  if (!input.password && !identity)
+    throw new AppError(400, 'PASSWORD_REQUIRED', 'Choose a password for email registration.');
   await assertEmailAllowed(input.email);
   if (identity?.email && identity.email !== input.email)
     throw new AppError(
@@ -46,6 +48,7 @@ export async function register(
       'Unable to create an account with those details.',
     );
   const token = randomToken();
+  const providerVerifiedEmail = Boolean(identity?.email);
   const free = await prisma.plan.findUnique({ where: { code: 'FREE' }, select: { id: true } });
   if (!free)
     throw new AppError(503, 'PLANS_UNAVAILABLE', 'Registration is temporarily unavailable.');
@@ -54,7 +57,8 @@ export async function register(
       data: {
         name: input.name,
         email: input.email,
-        passwordHash: await hashPassword(input.password),
+        passwordHash: input.password ? await hashPassword(input.password) : undefined,
+        emailVerifiedAt: providerVerifiedEmail ? new Date() : undefined,
         notificationPreference: { create: {} },
         ...(identity
           ? {
@@ -70,7 +74,7 @@ export async function register(
       select: publicUserSelect,
     });
     await tx.subscription.create({ data: { userId: created.id, planId: free.id } });
-    if (env.EMAIL_VERIFICATION_REQUIRED || identity)
+    if (!providerVerifiedEmail && (env.EMAIL_VERIFICATION_REQUIRED || identity))
       await tx.emailVerification.create({
         data: {
           userId: created.id,
@@ -87,7 +91,8 @@ export async function register(
     });
     return created;
   });
-  if (env.EMAIL_VERIFICATION_REQUIRED || identity) await sendVerificationEmail(user.email, token);
+  if (!providerVerifiedEmail && (env.EMAIL_VERIFICATION_REQUIRED || identity))
+    await sendVerificationEmail(user.email, token);
   return user;
 }
 export async function verifyEmail(token: string) {

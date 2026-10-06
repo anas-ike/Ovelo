@@ -24,7 +24,7 @@ const raw = z.object({
   DISCORD_CLIENT_ID: z.string().optional(),
   DISCORD_CLIENT_SECRET: z.string().optional(),
   DISCORD_CALLBACK_URL: z.string().url().optional(),
-  DISCORD_SCOPE: z.enum(['identify', 'identify email']).default('identify'),
+  DISCORD_SCOPE: z.enum(['identify', 'identify email']).default('identify email'),
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: number.default(587),
   SMTP_SECURE: boolean.default(false),

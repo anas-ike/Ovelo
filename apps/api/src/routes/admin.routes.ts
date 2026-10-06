@@ -78,13 +78,15 @@ adminRouter.post(
       );
       throw new AppError(401, 'INVALID_CREDENTIALS', 'Email or password is incorrect.');
     }
+    await clearPendingOAuth(req.cookies, res);
+    await clearPendingPolicyAuthentication(req.cookies?.[policyPendingCookie], res);
     const sessionId = await createSession(user.id, res, {
       admin: true,
       userAgent: req.get('user-agent'),
       replaceSessionId: req.auth?.sessionId,
     });
     await auditAdmin(req, res, 'ADMIN_LOGIN', 'User', user.id, 'SUCCESS', user.id);
-    res.json({ data: { authenticated: true, url: await adminEntryUrl(sessionId) } });
+    res.json({ data: { authenticated: true, destination: 'admin', url: await adminEntryUrl(sessionId) } });
   }),
 );
 adminRouter.get(

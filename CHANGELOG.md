@@ -2,6 +2,24 @@
 
 Every meaningful production pass adds a release here and in [CHANGELOG.js](CHANGELOG.js). The root package version is the application version. See [release workflow](docs/releases.md) and [production verification](docs/production-verification.md). Previous history is retained.
 
+## v0.4.1 — Passwordless Provider Sign-in and Administrator Entry
+
+Date: 2026-10-06
+
+### Fixed
+
+- Google and Discord verified-email signup now requires only the unchecked current Terms/Privacy confirmation. Provider accounts have no password, do not send redundant verification email, and later provider sign-ins go directly to the dashboard after exact-session confirmation.
+- Discord defaults to `identify email`. If the provider supplies no verified email, the completion form accepts an approved email for verification without asking for a password. Manual email registration still requires a password.
+- Pending verified-provider accounts use the consent route even when an older registration URL is opened. Email conflicts require explicit Settings linking; no matching-email account merging or role elevation is allowed.
+- Administrator password login cancels pending sign-in transactions, confirms `/admin/me`, and accepts only a same-origin `/admin/entry` destination. Administrator bootstrap is independent of the normal session, and the console logo links to `/admin`.
+
+### Verification
+
+- Disposable API suite: **PASS — 79 tests, none skipped**. Root suite: **11 passed**; default API suite: **37 passed, 42 skipped** without disposable services. Typecheck, lint, v0.4.1 build and dependency audit passed (zero production vulnerabilities). Configured-value, working-tree/history, deployed-frontend and startup-log secret checks passed; the private environment is ignored and untracked.
+- Built Chromium: **PASS — 15 workflow groups**, including first-time/repeat passwordless provider sign-in, account separation, invalid administrator dashboard destination, separate normal/admin sessions and all nine administrator sections at eight widths (72 responsive checks).
+- Production patch deployment: **PASS — v0.4.1**, web/API/worker started, health 200, existing ports retained. Public Chromium passed 36 page/width checks; nine admin HTML gates, ten unauthenticated admin API rejections, protected admin bundle, exact-session receipt rejection and live provider initialization passed. Discord now emits `identify email`; the primary owner and two users/two items remain present.
+- Authorized live provider and administrator credentials remain unavailable; provider authorization boundaries in isolated tests were simulated while database sessions, Redis, JWT verification and the built browser application were real. No live account login, recovery delivery or authenticated production upload is claimed.
+
 ## v0.4.0 — Account Isolation, Consent and Administrator UX
 
 Date: 2026-10-06

@@ -22,10 +22,12 @@ describe.skipIf(process.env.RUN_DB_TESTS !== 'true')('production authentication 
   const email = `auth-${run}@gmail.com`;
   const googleEmail = `google-${run}@gmail.com`;
   const discordEmail = `discord-${run}@gmail.com`;
+  const verifiedDiscordEmail = `verified-discord-${run}@gmail.com`;
   const manualConsentEmail = `manual-consent-${run}@gmail.com`;
   const adminEmail = `oauth-admin-${run}@gmail.com`;
   const password = `test-only-${run}`;
   let discordId = Date.now().toString();
+  let discordVerifiedEmail: string | undefined;
   const appOrigin = 'https://ovelo.lightsout.in';
   const consent = { termsVersion: policyVersions.terms, privacyVersion: policyVersions.privacy };
   let googleNonce = '';
@@ -92,7 +94,7 @@ describe.skipIf(process.env.RUN_DB_TESTS !== 'true')('production authentication 
           return Response.json({ access_token: 'test-access-token' });
         }
         if (value === 'https://discord.com/api/users/@me')
-          return Response.json({ id: discordId, username: 'Test Discord owner' });
+          return Response.json({ id: discordId, username: 'Test Discord owner', ...(discordVerifiedEmail ? { email: discordVerifiedEmail, verified: true } : {}) });
         throw new Error('Unexpected provider request');
       }),
     );
@@ -122,7 +124,7 @@ describe.skipIf(process.env.RUN_DB_TESTS !== 'true')('production authentication 
   });
   afterAll(async () => {
     await prisma.user.deleteMany({
-      where: { email: { in: [email, googleEmail, discordEmail, manualConsentEmail, adminEmail] } },
+      where: { email: { in: [email, googleEmail, discordEmail, verifiedDiscordEmail, manualConsentEmail, adminEmail] } },
     });
     await (await import('../src/services/migration.service.js')).storageQueue.close();
     await (await import('../src/config/redis.js')).closeSecurityRedis();
@@ -145,7 +147,7 @@ describe.skipIf(process.env.RUN_DB_TESTS !== 'true')('production authentication 
       expect(url.searchParams.get('prompt')).toBe('select_account');
       googleNonce = url.searchParams.get('nonce')!;
       googleChallenge = url.searchParams.get('code_challenge')!;
-    } else expect(url.searchParams.get('scope')).toBe('identify');
+    } else expect(url.searchParams.get('scope')).toBe((await import('../src/config/env.js')).env.DISCORD_SCOPE);
     return url.searchParams.get('state')!;
   }
   async function verify(agent: ReturnType<typeof request.agent>, targetEmail: string) {
@@ -235,16 +237,21 @@ describe.skipIf(process.env.RUN_DB_TESTS !== 'true')('production authentication 
       .get('/api/v1/auth/google/callback')
       .query({ state, code: 'test-code', redirect: 'https://attacker.example' });
     expect(callback.status).toBe(302);
-    expect(callback.headers.location).toBe(`${appOrigin}/register?oauth=complete`);
+    expect(callback.headers.location).toBe(`${appOrigin}/consent?source=oauth`);
+    expect((await agent.get('/api/v1/auth/oauth/pending')).body.data.kind).toBe('consent');
     expect((await agent.get('/api/v1/auth/me')).status).toBe(401);
     expect(
       (
         await agent
-          .post('/api/v1/auth/register')
-          .send({ name: 'Google owner', email: googleEmail, password, ...consent })
+          .post('/api/v1/auth/oauth/consent')
+          .send(consent)
       ).status,
     ).toBe(201);
-    await verify(agent, googleEmail);
+    const created = await prisma.user.findUniqueOrThrow({ where: { email: googleEmail } });
+    expect(created.passwordHash).toBeNull();
+    expect(created.emailVerifiedAt).not.toBeNull();
+    expect((await agent.get('/api/v1/auth/oauth/result')).body.data.user.email).toBe(googleEmail);
+    expect(vi.mocked(sendVerificationEmail).mock.calls.some(([to]) => to === googleEmail)).toBe(false);
     const stateAfterRegistration = await start(agent, 'google');
     expect(
       (
@@ -300,7 +307,51 @@ describe.skipIf(process.env.RUN_DB_TESTS !== 'true')('production authentication 
     ).toContain('OAUTH_FAILED');
     expect((await agent.get('/api/v1/auth/me')).status).toBe(401);
   });
-  it('completes identify-only Discord signup through verified email, then signs in directly', async () => {
+  it('creates a verified Discord account without a password and signs in directly on later visits', async () => {
+    const { env } = await import('../src/config/env.js');
+    const originalId = discordId, originalScope = env.DISCORD_SCOPE;
+    try {
+      env.DISCORD_SCOPE = 'identify email';
+      discordId = String(Date.now() + 2100000);
+      discordVerifiedEmail = verifiedDiscordEmail;
+      const agent = request.agent(app).set('X-Forwarded-For', '198.51.100.188');
+      const state = await start(agent, 'discord');
+      const callback = await agent.get('/api/v1/auth/discord/callback').query({ state, code: 'test-code' });
+      expect(callback.headers.location).toBe(`${appOrigin}/consent?source=oauth`);
+      expect((await agent.get('/api/v1/auth/consent/pending')).body.data).toMatchObject({ kind: 'oauth', newAccount: true, email: verifiedDiscordEmail });
+      expect((await agent.post('/api/v1/auth/oauth/consent').send({ ...consent, privacyVersion: 'obsolete' })).status).toBe(428);
+      expect(await prisma.user.findUnique({ where: { email: verifiedDiscordEmail } })).toBeNull();
+      expect((await agent.post('/api/v1/auth/oauth/consent').send(consent)).status).toBe(201);
+      const user = await prisma.user.findUniqueOrThrow({ where: { email: verifiedDiscordEmail } });
+      expect(user.passwordHash).toBeNull();
+      expect(user.emailVerifiedAt).not.toBeNull();
+      expect(user.role).toBe('USER');
+      expect((await agent.get('/api/v1/auth/oauth/result')).body.data.user.id).toBe(user.id);
+      const fresh = request.agent(app).set('X-Forwarded-For', '198.51.100.189');
+      const repeat = await start(fresh, 'discord');
+      expect((await fresh.get('/api/v1/auth/discord/callback').query({ state: repeat, code: 'test-code' })).headers.location).toBe(`${appOrigin}/auth/complete`);
+      expect((await fresh.get('/api/v1/auth/oauth/result')).body.data.user.id).toBe(user.id);
+      expect(vi.mocked(sendVerificationEmail).mock.calls.some(([to]) => to === verifiedDiscordEmail)).toBe(false);
+    } finally {
+      discordId = originalId;
+      discordVerifiedEmail = undefined;
+      env.DISCORD_SCOPE = originalScope;
+    }
+  });
+  it('does not merge an unlinked verified provider with another account by email', async () => {
+    const originalId = discordId;
+    try {
+      discordId = String(Date.now() + 2200000);
+      discordVerifiedEmail = googleEmail;
+      const agent = request.agent(app).set('X-Forwarded-For', '198.51.100.190');
+      const state = await start(agent, 'discord');
+      const response = await agent.get('/api/v1/auth/discord/callback').query({ state, code: 'test-code' });
+      expect(response.headers.location).toContain('LINK_REQUIRED');
+      expect((await agent.get('/api/v1/auth/me')).status).toBe(401);
+      expect(await prisma.account.findUnique({ where: { provider_providerAccountId: { provider: 'discord', providerAccountId: discordId } } })).toBeNull();
+    } finally { discordId = originalId; discordVerifiedEmail = undefined; }
+  });
+  it('completes identify-only Discord signup without a password through verified email, then signs in directly', async () => {
     const agent = request.agent(app);
     const state = await start(agent, 'discord');
     const callback = await agent
@@ -311,11 +362,12 @@ describe.skipIf(process.env.RUN_DB_TESTS !== 'true')('production authentication 
     expect((await agent.get('/api/v1/auth/oauth/pending')).body).toMatchObject({
       data: { provider: 'discord' },
     });
+    expect((await agent.post('/api/v1/auth/oauth/register').send({ name: 'Discord owner', email: discordEmail, password, ...consent })).status).toBe(400);
     expect(
       (
         await agent
-          .post('/api/v1/auth/register')
-          .send({ name: 'Discord owner', email: discordEmail, password, ...consent })
+          .post('/api/v1/auth/oauth/register')
+          .send({ name: 'Discord owner', email: discordEmail, ...consent })
       ).status,
     ).toBe(201);
     const state2 = await start(agent, 'discord');
@@ -528,14 +580,9 @@ describe.skipIf(process.env.RUN_DB_TESTS !== 'true')('production authentication 
     expect(
       await prisma.policyConsent.count({ where: { userId: userB.id, policy: 'PRIVACY' } }),
     ).toBe(2);
-    expect(
-      (
-        await request(app)
-          .post('/api/v1/auth/login')
-          .set('X-Forwarded-For', '198.51.100.175')
-          .send({ email: discordEmail, password })
-      ).status,
-    ).toBe(200);
+    const fresh = request.agent(app).set('X-Forwarded-For', '198.51.100.175');
+    const freshState = await start(fresh, 'discord');
+    expect((await fresh.get('/api/v1/auth/discord/callback').query({ state: freshState, code: 'test-code' })).headers.location).toBe(`${appOrigin}/auth/complete`);
   });
   it('rotates the browser session on a successful provider switch while preserving its separate admin session', async () => {
     const agent = request.agent(app).set('X-Forwarded-For', '198.51.100.180');

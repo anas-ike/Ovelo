@@ -128,7 +128,7 @@ function AdminConsole() {
         Skip to administrator content
       </a>
       <aside className="admin-sidebar">
-        <Logo />
+        <Logo to="/admin" />
         <span className="admin-label">OPERATIONS · {me.data.data.role}</span>
         <nav aria-label="Administrator navigation">
           {sections

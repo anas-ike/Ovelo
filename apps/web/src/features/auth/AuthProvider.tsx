@@ -38,7 +38,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const identity = useRef<string | null>(null);
   const mutating = useRef(false);
   const channel = useRef<BroadcastChannel | null>(null);
-  const publicPage = ['/', '/how-it-works', '/terms', '/privacy', '/consent', '/auth/complete'].includes(location.pathname);
+  const adminPage = /^\/admin(?:\/|$)/.test(location.pathname);
+  const publicPage = adminPage || ['/', '/how-it-works', '/terms', '/privacy', '/consent', '/auth/complete'].includes(location.pathname);
   const refresh = useCallback(async () => {
     if (mutating.current) return;
     const current = ++request.current;
@@ -182,7 +183,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
   return (
     <Context.Provider value={value}>
-      <Fragment key={user?.id || 'anonymous'}>{children}</Fragment>
+      <Fragment key={adminPage ? 'administrator' : user?.id || 'anonymous'}>{children}</Fragment>
     </Context.Provider>
   );
 }

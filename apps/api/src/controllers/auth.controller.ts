@@ -48,11 +48,11 @@ export const registerController = asyncHandler(async (req, res) => {
   const body = registerSchema.parse(req.body);
   assertPolicyVersions(body, ['TERMS', 'PRIVACY']);
   const identity = await pendingIdentity(req.cookies?.[pendingCookie]);
-  if (identity?.userId)
+  if (identity)
     throw new AppError(
       400,
       'OAUTH_PENDING_INVALID',
-      'Complete policy acceptance to sign in to your existing account.',
+      'Finish provider sign-in using its policy confirmation or email-completion step. No password is required.',
     );
   const user = await register(body, identity);
   await pendingIdentity(req.cookies?.[pendingCookie], true);
@@ -92,7 +92,10 @@ export const loginController = asyncHandler(async (req, res) => {
 });
 export const pendingConsentController = asyncHandler(async (req, res) => {
   const oauth = await pendingIdentity(req.cookies?.[pendingCookie]);
-  if (oauth?.userId) return res.json({ data: { kind: 'oauth', provider: oauth.provider } });
+  if (oauth?.userId || oauth?.email)
+    return res.json({
+      data: { kind: 'oauth', provider: oauth.provider, newAccount: !oauth.userId, email: oauth.email },
+    });
   const policy = await pendingPolicyAuthentication(req.cookies?.[policyPendingCookie]);
   res.json({ data: { kind: policy ? 'login' : null } });
 });

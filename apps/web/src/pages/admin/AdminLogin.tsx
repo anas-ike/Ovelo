@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ShieldCheck } from 'lucide-react';
 import { Field, Input } from '../../components/Field';
 import { Button } from '../../components/Button';
 import { Logo } from '../../components/Logo';
 import { post, get, apiBase } from '../../lib/api';
 export function AdminLogin() {
+  const client = useQueryClient();
   const [params] = useSearchParams();
   const providerError = params.get('oauthError') ? 'Administrator provider sign-in failed. Use a linked administrator identity or your administrator password.' : '';
   const [email, setEmail] = useState('');
@@ -20,7 +21,15 @@ export function AdminLogin() {
     setError('');
     try {
       const result = await post<{ data: { url: string } }>('/admin/login', { email, password });
-      window.location.assign(result.data.url);
+      const entry = new URL(result.data.url, window.location.origin);
+      if (entry.origin !== window.location.origin || entry.pathname !== '/admin/entry')
+        throw new Error('Administrator sign-in did not return a console entry. Refresh this page and try again.');
+      const identity = await get<{ data: { role: string } }>('/admin/me');
+      if (!['OWNER', 'ADMIN'].includes(identity.data.role))
+        throw new Error('Administrator access could not be confirmed.');
+      await client.cancelQueries();
+      client.clear();
+      window.location.assign(entry.href);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to authenticate.');
     } finally {

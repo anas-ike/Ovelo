@@ -4,7 +4,7 @@
 
 Production had a Google identity and a Discord identity attached to one regular Ovelo user. The Discord link and its `OAUTH_ACCOUNT_LINKED` event dated from 2026-10-05, before the sign-in/link separation fix. Logging out revokes a session; it does not remove a persisted provider association. Different provider emails do not make explicitly linked identities separate accounts.
 
-With the affected user's approval, the unwanted Discord link was removed and two affected normal sessions revoked in a database transaction. The Google identity, administrator sessions and ownership records were preserved. A private recovery backup was retained outside the public web root and Git. Subsequent Discord authorization resolves an unlinked provider identity and requires separate registration; the production identify-only scope still requires the user to supply and verify their own email.
+With the affected user's approval, the unwanted Discord link was removed and two affected normal sessions revoked in a database transaction. The Google identity, administrator sessions and ownership records were preserved. A private recovery backup was retained outside the public web root and Git. At the time of that repair, subsequent Discord authorization resolved an unlinked provider identity and required separate registration; the identify-only production scope required manually supplying and verifying an email. The passwordless follow-up below supersedes that onboarding behavior.
 
 ## Callback and browser boundary changes
 
@@ -23,3 +23,11 @@ With the affected user's approval, the unwanted Discord link was removed and two
 - Typecheck, lint, production build, dependency audit and heuristic secret scan passed. Production audit reports zero vulnerabilities.
 - The production account-link defect is confirmed and repaired. The reported Google blank-login return could not be reproduced using the user's live provider account; no authorized external browser credentials were available. The old browser session-check behavior suppressed failures, and the new completion boundary makes those failures explicit. A live Google retry is still needed to establish whether any browser-specific cookie or provider failure remains.
 - The fix tree was deployed and production restarted successfully: API health 200/v0.4.0, all three services started, existing ports unchanged, `/auth/complete` served with no-store/noindex, and unauthenticated completion rejected with 401/`OAUTH_SESSION_MISMATCH`. A post-repair query confirmed zero Discord links on the affected Google user and zero remaining active normal sessions. The user deferred the live Google retry because they cannot test right now.
+
+## v0.4.1 passwordless and administrator-entry follow-up
+
+The user later reported that new Google/Discord authorization prefilled password registration and that `/admin/login` reached `/dashboard`. The password registration was reproduced in the first-time-provider path. The production primary owner and all console features remained present; the exact live administrator redirect cause remains unconfirmed without production credentials.
+
+Verified-email provider onboarding now creates a passwordless account after current policy confirmation. Discord requests `identify email`; identify-only/missing-email completion remains passwordless but requires verifying the manually supplied email. Subsequent provider sign-in resolves the exact provider ID and existing consent, with the same receipt/session boundary and no email merging. Administrator entry rejects `/dashboard`, confirms the separate administrator identity, isolates normal-session bootstrap/remounts, clears pending login handoffs and keeps the console home link on `/admin`.
+
+Disposable API verification passed 79 tests; built Chromium passed 15 workflow groups including first-time/repeat Google and Discord, separate normal/admin sessions, rejected normal-dashboard destination and 72 responsive administrator checks. Patch deployment and authorized live account confirmation are recorded in [production verification](production-verification.md).

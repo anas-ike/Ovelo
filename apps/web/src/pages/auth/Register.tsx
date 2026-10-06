@@ -39,13 +39,20 @@ export function Register() {
         throw new Error(
           'Accept the Terms of Service and acknowledge the Privacy Policy to continue.',
         );
-      await post('/auth/register', {
+      const result = await post<{ data: { authenticated?: boolean } }>(
+        completing ? '/auth/oauth/register' : '/auth/register',
+        {
           name,
           email,
-          password,
+          ...(completing ? {} : { password }),
           termsVersion: policyVersions.terms,
           privacyVersion: policyVersions.privacy,
-        });
+        },
+      );
+      if (result.data.authenticated) {
+        navigate('/auth/complete', { replace: true });
+        return;
+      }
       navigate(`/verify-email?email=${encodeURIComponent(email)}`);
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Unable to create your account.');
@@ -58,8 +65,8 @@ export function Register() {
   if (pending.error) return <AuthShell title="Sign-in request expired" subtitle="Start provider sign-in again."><p role="alert" className="form-alert">{pending.error.message}</p><OAuthButtons /></AuthShell>;
   return (
     <AuthShell
-      title="Make it yours"
-      subtitle="Create a private record of everything you own."
+      title={completing ? 'Finish provider sign-in' : 'Make it yours'}
+      subtitle={completing ? 'No password is required. Add your email to finish setting up your account.' : 'Create a private record of everything you own.'}
     >
       {completing &&
         (pending.error ? (
@@ -68,7 +75,7 @@ export function Register() {
           </p>
         ) : (
           <p className="auth-subtitle">
-            {pending.data?.data.email ? 'Your provider verified your email. Choose a recovery password and accept the current policies to finish creating your account.' : 'Discord verified your identity. Add an approved email and a recovery password, then verify the email to finish registration.'}
+            {pending.data?.data.email ? 'Your provider verified your email. Accept the policies to create your account and sign in without a password.' : 'Discord verified your identity but did not provide a verified email. Add and verify your email, then continue with Discord. No password is required.'}
           </p>
         ))}
       <form className="auth-form" onSubmit={submit}>
@@ -97,7 +104,7 @@ export function Register() {
             />
           </Field>
         )}
-        {(
+        {!completing && (
           <Field label="Password" hint="At least 12 characters">
             <Input
               type="password"
@@ -130,7 +137,7 @@ export function Register() {
           </span>
         </label>
         <Button type="submit" loading={loading} className="full-button">
-          Create my Ovelo <span>→</span>
+          {completing ? 'Continue without a password' : 'Create my Ovelo'} <span>→</span>
         </Button>
       </form>
       <OAuthButtons />

@@ -10,6 +10,7 @@ import {
   providerResult,
   pendingProvider,
   consentProvider,
+  registerProvider,
   linkProvider,
 } from '../controllers/oauth.controller.js';
 import { csrfTokenController } from '../controllers/csrf.controller.js';
@@ -48,6 +49,7 @@ authRouter.post(
 authRouter.get('/oauth/pending', pendingProvider);
 authRouter.get('/oauth/result', providerResult);
 authRouter.post('/oauth/consent', rateLimit('oauth-consent', 5), consentProvider);
+authRouter.post('/oauth/register', rateLimit('oauth-register', 5), registerProvider);
 authRouter.get('/csrf', requireAuth, csrfTokenController);
 authRouter.post('/:provider/link', requireAuth, csrf, rateLimit('oauth-link', 10), linkProvider);
 authRouter.post('/register', rateLimit('register', 5), registerController);

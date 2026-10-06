@@ -105,13 +105,13 @@ describe.skipIf(process.env.RUN_DB_TESTS !== 'true')(
             })
         ).status,
       ).toBe(200);
-      expect(
-        (
-          await owner
-            .post('/api/v1/admin/login')
-            .send({ email: ` ${ownerEmail.toUpperCase()} `, password })
-        ).status,
-      ).toBe(200);
+      const adminLogin = await owner.post('/api/v1/admin/login').send({ email: ` ${ownerEmail.toUpperCase()} `, password });
+      expect(adminLogin.status).toBe(200);
+      expect(adminLogin.body.data.destination).toBe('admin');
+      expect(new URL(adminLogin.body.data.url).pathname).toBe('/admin/entry');
+      expect(adminLogin.body.data.url).not.toContain('/dashboard');
+      expect((await owner.get('/api/v1/admin/me')).body.data.role).toBe('OWNER');
+      expect((await owner.get('/api/v1/auth/me')).status).toBe(401);
       csrfA = (await a.get('/api/v1/auth/csrf')).body.data.csrfToken;
       csrfOwner = (await owner.get('/api/v1/admin/csrf')).body.data.csrfToken;
     }, 20000);

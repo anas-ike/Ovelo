@@ -3,6 +3,34 @@
 // CommonJS matches the root package; applications consume this at build/startup.
 module.exports.changelog = [
   {
+    version: '0.4.1',
+    name: 'Passwordless Provider Sign-in and Administrator Entry',
+    date: '2026-10-06',
+    changes: [
+      'Create verified Google/Discord accounts after current policy consent without a password or redundant email verification; subsequent sign-ins open the dashboard directly.',
+      'Request Discord identify email by default; retain passwordless manual email verification when the provider supplies no verified email.',
+      'Reject password registration for pending provider identities and preserve provider-ID account separation and exact-session OAuth completion.',
+      'Confirm administrator session and same-origin console entry before navigation; cancel pending sign-in handoffs and keep administrator bootstrap and home navigation on /admin.',
+    ],
+    verification: {
+      build: 'PASS — production build completed for v0.4.1',
+      typecheck: 'PASS',
+      lint: 'PASS',
+      dedicatedApi: 'PASS — 79 tests passed on disposable PostgreSQL/Redis; none skipped',
+      isolatedBrowser: 'PASS — 15 workflow groups and 72 admin responsive checks; provider boundary simulated',
+      productionDeployment: 'PASS — v0.4.1 web/API/worker started, health 200, ports unchanged and private Discord scope applied',
+      productionPublic: 'PASS — 36 responsive public/auth checks, nine admin HTML gates, ten API rejections, bundle gate and secure provider initialization',
+      googleOAuth: 'BLOCKED — authorized live browser/account unavailable',
+      discordOAuth: 'BLOCKED — authorized live browser/account unavailable',
+      administratorLogin: 'PARTIAL — isolated owner entry and all nine console sections passed; live credentials unavailable',
+      rootTests: 'PASS — 11 tests including release registry and startup checks',
+      defaultApiTests: 'PASS — 37 passed, 42 skipped without disposable services',
+      audit: 'PASS — 0 production dependency vulnerabilities',
+      secrets: 'PASS — source/configured-value, history, deployed frontend and startup-log checks; ignored environment untracked',
+      verdict: 'PARTIAL — passwordless sign-in and administrator console verified in isolation and deployed; authorized live account confirmation unavailable',
+    },
+  },
+  {
     version: '0.4.0',
     name: 'Account Isolation, Consent and Administrator UX',
     date: '2026-10-06',

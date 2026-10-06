@@ -1,5 +1,36 @@
 # Ovelo Production Verification
 
+Ovelo v0.4.1 — Passwordless Provider Sign-in and Administrator Entry
+
+Date: 2026-10-06
+
+## v0.4.1 verification
+
+### Findings and remediation
+
+- New provider identities were routed through password registration despite authenticated provider identity. Verified-email Google/Discord identities now use unchecked current Terms/Privacy consent to create a passwordless account and exact-session completion receipt. No redundant Ovelo email-verification message is sent. Existing linked provider users with current policies sign in directly.
+- Discord now defaults to `identify email`; only a provider-verified email is trusted. Identify-only/missing-verified-email completion takes an approved manual email and requires verification, without a password. Manual password registration, matching-email conflict checks, provider-ID uniqueness, policy/upload enforcement and ordinary user roles remain enforced.
+- The reported `/admin/login` to `/dashboard` production navigation remains unconfirmed without access to the primary owner's credentials. Source and metadata inspection confirmed the provisioned primary owner and full console were present. The browser now refuses a normal-dashboard destination, confirms `/admin/me`, and navigates only through same-origin `/admin/entry`. Administrator bootstrap/remounts and home navigation use the administrator boundary; successful admin login clears pending sign-in handoffs and preserves the independent normal-user session.
+
+### Available evidence
+
+- Dedicated disposable PostgreSQL/Redis API suite: **PASS — 79 tests, none skipped**. Provider and SMTP boundaries were simulated; actual database sessions, Redis transactions, Google JWT verification, authorization and account isolation were exercised.
+- Built real Chromium: **PASS — 15 workflow groups**, including first-time and repeated Google/Discord sign-in without passwords, unchecked policies, rejected `/dashboard` admin destination, normal/admin session separation, browser identity/cache/logout checks, valid JPG/PDF uploads and real HTTP 404.
+- Administrator responsive audit: **PASS — nine sections at eight widths, 72 checks**, including modal overflow/Escape and mobile administrator create/error recovery.
+- Typecheck, lint, v0.4.1 build, release metadata/root tests (**11 passed**), default API suite (**37 passed, 42 skipped** without disposable services) and dependency audit (**zero production vulnerabilities**): **PASS**. Working-tree/history heuristic, configured-value, deployed-frontend and startup-log secret scans passed; the private environment is ignored and untracked.
+- Production deployment/restart: **PASS — v0.4.1**, API health 200, web/API/worker started, ports unchanged, no new process shutdown failure, no configured secret found in inspected startup logs. The only private environment change was Discord's `identify email` scope. No schema migration was needed.
+- Public production Chromium: **PASS — 36 page/width checks** at 320, 390, 768 and 1440px, correct v0.4.1 metadata, one H1, no horizontal overflow, private noindex/no-store and no uncaught page errors. Nine administrator HTML routes and the lazy console bundle redirect unauthenticated clients to `/admin/login`; ten administrator API endpoints return 401. Missing exact-session OAuth completion returns 401/`OAUTH_SESSION_MISMATCH`.
+- Live provider initialization: **PASS** — correct production callbacks, secure/HttpOnly/Lax browser-bound state, bounded Redis TTL, Google nonce/S256 PKCE and Discord `identify email`. No authenticated session was issued by these initialization probes; only probe-owned temporary Redis state was removed.
+- Metadata-only production check before/after deployment: primary owner present, two users and two ownership items retained. No administrator credential or role repair was performed. Previous v0.4.0 evidence is retained below.
+
+### Live-account limits
+
+Authorized live Google/Discord and primary-owner credentials remain unavailable; no successful production provider callback, primary-owner login, recovery delivery or authenticated production upload is claimed. Provider/browser simulations use disposable accounts only. The configured administrator bootstrap password does not match the persisted primary-owner hash; no password/role reset was performed. Previously observed SMTP authentication failure still affects manually supplied-email verification/recovery; trusted provider-verified email avoids redundant SMTP verification.
+
+Release commit reference after publication: `git log -1 --format=%H -- CHANGELOG.js`.
+
+## Prior v0.4.0 verification
+
 Ovelo v0.4.0 — Account Isolation, Consent and Administrator UX
 
 Date: 2026-10-06
