@@ -34,6 +34,15 @@ import {
   pendingConsentController,
   consentController,
 } from '../controllers/auth.controller.js';
+import {
+  profileController,
+  updateProfileController,
+  profileUpload,
+  uploadAvatarController,
+  getAvatarController,
+  deleteAvatarController,
+  redeemPremiumCodeController,
+} from '../controllers/profile.controller.js';
 export const authRouter = Router();
 authRouter.get('/providers', providerCapabilities);
 authRouter.get('/consent/pending', pendingConsentController);
@@ -59,6 +68,12 @@ authRouter.post('/reset-password', rateLimit('reset-password', 5), resetControll
 authRouter.post('/verify-email', rateLimit('verify-email', 10), verifyController);
 authRouter.post('/logout', csrf, logoutController);
 authRouter.get('/me', requireAuth, meController);
+authRouter.get('/profile', requireAuth, profileController);
+authRouter.patch('/profile', requireAuth, csrf, updateProfileController);
+authRouter.get('/avatar', requireAuth, getAvatarController);
+authRouter.post('/avatar', requireAuth, csrf, profileUpload.single('file'), uploadAvatarController);
+authRouter.delete('/avatar', requireAuth, csrf, deleteAvatarController);
+authRouter.post('/subscription/redeem', requireAuth, csrf, rateLimit('premium-redeem', 5), redeemPremiumCodeController);
 authRouter.get('/sessions', requireAuth, sessionsController);
 authRouter.post('/change-password', requireAuth, csrf, changePasswordController);
 authRouter.post('/change-email', requireAuth, csrf, changeEmailController);

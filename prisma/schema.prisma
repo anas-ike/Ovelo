@@ -58,6 +58,7 @@ model User {
   storageUsedBytes BigInt @default(0)
   storageReservedBytes BigInt @default(0)
   itemCount Int @default(0)
+  avatarStorageObjectId String? @unique @db.Uuid
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   accounts Account[]
@@ -76,6 +77,9 @@ model User {
   securityEvents SecurityEvent[]
   adminAudits AdminAuditLog[]
   policyConsents PolicyConsent[]
+  avatarStorageObject StorageObject? @relation("UserAvatar", fields: [avatarStorageObjectId], references: [id], onDelete: SetNull)
+  premiumCodesCreated PremiumCode[] @relation("PremiumCodeCreatedBy")
+  premiumCodesRedeemed PremiumCode[] @relation("PremiumCodeRedeemedBy")
   @@index([createdAt])
 }
 model PolicyConsent {
@@ -388,6 +392,7 @@ model StorageObject {
   document Document?
   photo ItemPhoto?
   migrations MigrationJob[]
+  avatarForUser User? @relation("UserAvatar")
   @@unique([provider, storageKey])
   @@index([userId, deletedAt])
 }
@@ -427,6 +432,7 @@ model Plan {
   updatedAt DateTime @updatedAt
   entitlements Entitlement[]
   subscriptions Subscription[]
+  premiumCodes PremiumCode[]
 }
 model Entitlement {
   id String @id @default(uuid()) @db.Uuid
@@ -448,6 +454,22 @@ model Subscription {
   updatedAt DateTime @updatedAt
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   plan Plan @relation(fields: [planId], references: [id], onDelete: Restrict)
+}
+model PremiumCode {
+  id String @id @default(uuid()) @db.Uuid
+  codeHash String @unique
+  codeLastFour String @db.VarChar(8)
+  planId String @db.Uuid
+  createdById String? @db.Uuid
+  redeemedById String? @db.Uuid
+  redeemedAt DateTime?
+  expiresAt DateTime?
+  createdAt DateTime @default(now())
+  plan Plan @relation(fields: [planId], references: [id], onDelete: Restrict)
+  createdBy User? @relation("PremiumCodeCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  redeemedBy User? @relation("PremiumCodeRedeemedBy", fields: [redeemedById], references: [id], onDelete: SetNull)
+  @@index([redeemedAt])
+  @@index([createdAt])
 }
 model AdminAuditLog {
   id String @id @default(uuid()) @db.Uuid

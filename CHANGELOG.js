@@ -3,6 +3,33 @@
 // CommonJS matches the root package; applications consume this at build/startup.
 module.exports.changelog = [
   {
+    version: '0.4.2',
+    name: 'Profiles and Premium Access Administration',
+    date: '2026-10-06',
+    changes: [
+      'Add a profile menu from the top-right avatar with editable name, secure profile-picture upload/removal, linked-provider status and subscription management.',
+      'Show connected Google/Discord identities in Settings and prevent a connected provider from being offered as a duplicate link.',
+      'Add one-time Premium access codes with hashed storage, atomic redemption, permanent delete controls and audit events.',
+      'Allow administrators to activate or pause Premium for a normal user without changing roles or accessing that user’s private records.',
+    ],
+    verification: {
+      build: 'PASS — v0.4.2 production build completed',
+      typecheck: 'PASS',
+      lint: 'PASS',
+      dedicatedApi: 'PASS — 80 tests passed on disposable PostgreSQL/Redis; none skipped',
+      isolatedBrowser: 'PASS — 16 workflow groups and 72 admin responsive checks; profile/settings and Premium admin surface included',
+      productionDeployment: 'PASS — v0.4.2 migration applied, web/API/worker started, health 200 and ports unchanged',
+      productionPublic: 'PASS — 36 responsive public/auth checks, 9 HTML gates, 11 API protections, bundle gate and provider initialization',
+      premiumSecurity: 'PASS — normal users cannot call admin controls; redemption is atomic and one-time',
+      rootTests: 'PASS — 11 tests including release registry and startup checks',
+      defaultApiTests: 'PASS — 37 passed, 43 skipped without disposable services',
+      audit: 'PASS — 0 npm audit vulnerabilities',
+      secrets: 'PASS — staged source, configured-value, history, deployed frontend and startup-log checks',
+      dataDeletionArchive: 'DEFERRED — premium-data ZIP/60-day deletion workflow will be designed separately',
+      verdict: 'PARTIAL — profile/Premium implementation deployed and verified; live authenticated account checks unavailable and data archive workflow deferred',
+    },
+  },
+  {
     version: '0.4.1',
     name: 'Passwordless Provider Sign-in and Administrator Entry',
     date: '2026-10-06',

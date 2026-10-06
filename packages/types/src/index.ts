@@ -14,6 +14,7 @@ export interface UserProfile {
   email: string;
   role: 'USER' | 'ADMIN' | 'OWNER';
   emailVerifiedAt: string | null;
+  hasAvatar?: boolean;
 }
 export interface ItemSummary {
   id: string;

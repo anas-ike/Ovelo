@@ -1,5 +1,28 @@
 # Ovelo Production Verification
 
+Ovelo v0.4.2 — Profiles and Premium Access Administration
+
+Date: 2026-10-06
+
+## v0.4.2 verification
+
+### Implemented
+
+- Added `/profile` from the authenticated top-right avatar. The profile surface updates the display name, uploads/removes validated image avatars through the configured storage provider, lists provider identities, shows subscription state and redeems Premium codes.
+- Settings now displays connected provider names and disables duplicate link actions. Provider account identity remains keyed by provider/account ID; linking remains explicit, authenticated and CSRF-protected.
+- Added hashed, atomic, one-time Premium codes. The raw generated code is returned only on creation, listings expose only the final four characters, deletion removes the database row, and redemption activates Premium without changing a user role.
+- Added administrator user actions to activate or pause Premium. Paused subscriptions retain their Premium record for clear status but resolve to Free entitlements; all actions require administrator authentication/CSRF and are audited.
+
+### Deferred by request
+
+Premium-data ZIP export, per-product PDFs, 60-day download expiry, automatic data removal, and an administrator data-deletion toggle remain deferred to the next design pass.
+
+### Verification status
+
+Dedicated API suite: **PASS — 80 tests, none skipped**. Root suite: **11 passed**; default API suite: **37 passed, 43 skipped** without disposable services. Typecheck, lint, production build, dependency audit and source secret checks passed. Built Chromium: **PASS — 16 workflow groups**, including connected Discord status, top-right profile navigation, Premium admin surface, provider isolation and 72 responsive admin checks. Migration, deployment and production public/security checks are recorded below.
+
+## Prior v0.4.1 verification
+
 Ovelo v0.4.1 — Passwordless Provider Sign-in and Administrator Entry
 
 Date: 2026-10-06
@@ -18,10 +41,10 @@ Date: 2026-10-06
 - Built real Chromium: **PASS — 15 workflow groups**, including first-time and repeated Google/Discord sign-in without passwords, unchecked policies, rejected `/dashboard` admin destination, normal/admin session separation, browser identity/cache/logout checks, valid JPG/PDF uploads and real HTTP 404.
 - Administrator responsive audit: **PASS — nine sections at eight widths, 72 checks**, including modal overflow/Escape and mobile administrator create/error recovery.
 - Typecheck, lint, v0.4.1 build, release metadata/root tests (**11 passed**), default API suite (**37 passed, 42 skipped** without disposable services) and dependency audit (**zero production vulnerabilities**): **PASS**. Working-tree/history heuristic, configured-value, deployed-frontend and startup-log secret scans passed; the private environment is ignored and untracked.
-- Production deployment/restart: **PASS — v0.4.1**, API health 200, web/API/worker started, ports unchanged, no new process shutdown failure, no configured secret found in inspected startup logs. The only private environment change was Discord's `identify email` scope. No schema migration was needed.
-- Public production Chromium: **PASS — 36 page/width checks** at 320, 390, 768 and 1440px, correct v0.4.1 metadata, one H1, no horizontal overflow, private noindex/no-store and no uncaught page errors. Nine administrator HTML routes and the lazy console bundle redirect unauthenticated clients to `/admin/login`; ten administrator API endpoints return 401. Missing exact-session OAuth completion returns 401/`OAUTH_SESSION_MISMATCH`.
+- Production deployment/restart: **PASS — v0.4.2**, additive `20261006170000_premium_codes_and_avatars` migration applied, API health 200, web/API/worker started, ports unchanged, no new process shutdown failure, no configured secret found in inspected startup logs. The private environment remained unchanged.
+- Public production Chromium: **PASS — 36 page/width checks** at 320, 390, 768 and 1440px, correct v0.4.2 metadata, one H1, no horizontal overflow, private noindex/no-store and no uncaught page errors. Nine administrator HTML routes and the lazy console bundle redirect unauthenticated clients to `/admin/login`; 11 administrator/profile API protections return 401. Missing exact-session OAuth completion returns 401/`OAUTH_SESSION_MISMATCH`.
 - Live provider initialization: **PASS** — correct production callbacks, secure/HttpOnly/Lax browser-bound state, bounded Redis TTL, Google nonce/S256 PKCE and Discord `identify email`. No authenticated session was issued by these initialization probes; only probe-owned temporary Redis state was removed.
-- Metadata-only production check before/after deployment: primary owner present, two users and two ownership items retained. No administrator credential or role repair was performed. Previous v0.4.0 evidence is retained below.
+- Metadata-only production check after deployment: one primary owner, two normal users, two ownership items and zero premium codes. No administrator credential/role repair or Premium grant was performed. Previous v0.4.1 evidence is retained below.
 
 ### Live-account limits
 

@@ -19,6 +19,7 @@ import {
   resetPassword,
   verifyEmail,
   publicUserSelect,
+  toPublicUser,
 } from '../auth/auth.service.js';
 import {
   createSession,
@@ -84,8 +85,9 @@ export const loginController = asyncHandler(async (req, res) => {
         id: user.id,
         name: user.name,
         email: user.email,
-        role: user.role,
-        emailVerifiedAt: user.emailVerifiedAt,
+         role: user.role,
+         emailVerifiedAt: user.emailVerifiedAt,
+         hasAvatar: user.hasAvatar,
       },
     },
   });
@@ -151,7 +153,7 @@ export const meController = asyncHandler(async (req, res) => {
     where: { id: req.auth!.userId },
     select: publicUserSelect,
   });
-  res.json({ data: { user } });
+  res.json({ data: { user: toPublicUser(user) } });
 });
 export const verifyController = asyncHandler(async (req, res) => {
   const { token } = tokenSchema.parse(req.body);

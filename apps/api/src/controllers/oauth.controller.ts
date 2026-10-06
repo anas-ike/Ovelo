@@ -10,7 +10,7 @@ import { assertPolicyVersions, requireCurrentPolicyConsent } from '../auth/polic
 import { createSession, destroySession } from '../auth/session.service.js';
 import { prisma } from '../database/prisma.js';
 import { oauthResultCookie, pendingOAuthResult, saveOAuthResult } from '../auth/oauth-result.service.js';
-import { publicUserSelect, register } from '../auth/auth.service.js';
+import { publicUserSelect, register, toPublicUser } from '../auth/auth.service.js';
 import { email, policyConsentSchema } from '@ovelo/validation';
 
 async function createProviderSession(userId: string, req: Request, res: Response) {
@@ -39,7 +39,7 @@ export const providerResult = asyncHandler(async (req, res) => {
   const user = await prisma.user.findUniqueOrThrow({ where: { id: result.userId }, select: publicUserSelect });
   // Remains readable for the short TTL so retries/StrictMode are idempotent;
   // starting another sign-in or logout deletes it immediately.
-  res.json({ data: { user } });
+  res.json({ data: { user: toPublicUser(user) } });
 });
 export const pendingProvider = asyncHandler(async (req, res) => {
   const identity = await pendingIdentity(req.cookies?.[pendingCookie]);

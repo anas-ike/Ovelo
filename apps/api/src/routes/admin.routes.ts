@@ -29,6 +29,7 @@ import { storageQueue } from '../services/migration.service.js';
 import { adminEntryUrl, adminGate } from '../auth/admin-gate.service.js';
 import { clearPendingOAuth } from '../auth/oauth-pending.service.js';
 import { clearPendingPolicyAuthentication, policyPendingCookie } from '../auth/policy-pending.service.js';
+import { createPremiumCode, listPremiumCodes, setPremiumSubscription } from '../services/subscription.service.js';
 export const adminRouter = Router();
 const publicAdmin = {
   id: true,
@@ -326,12 +327,27 @@ adminRouter.get(
       (range) =>
         prisma.user.findMany({
           where,
-          select: { ...publicAdmin, itemCount: true },
+           select: {
+             ...publicAdmin,
+             itemCount: true,
+             subscription: { select: { status: true, plan: { select: { code: true, name: true } } } },
+           },
           ...range,
           orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         }),
       () => prisma.user.count({ where }),
     );
+  }),
+);
+adminRouter.patch(
+  '/users/:id/subscription',
+  csrf,
+  asyncHandler(async (req, res) => {
+    const id = z.string().uuid().parse(req.params.id);
+    const body = z.object({ action: z.enum(['ACTIVATE', 'PAUSE']) }).strict().parse(req.body);
+    const subscription = await setPremiumSubscription(id, body.action);
+    await auditAdmin(req, res, body.action === 'ACTIVATE' ? 'PREMIUM_ACTIVATED' : 'PREMIUM_PAUSED', 'User', id);
+    res.json({ data: subscription });
   }),
 );
 adminRouter.patch(
@@ -702,5 +718,31 @@ adminRouter.get(
         }),
       () => prisma.subscription.count({ where }),
     );
+  }),
+);
+adminRouter.get(
+  '/premium-codes',
+  asyncHandler(async (_req, res) => res.json({ data: await listPremiumCodes() })),
+);
+adminRouter.post(
+  '/premium-codes',
+  csrf,
+  asyncHandler(async (req, res) => {
+    const body = z.object({ expiresAt: z.coerce.date().nullable().optional() }).strict().parse(req.body ?? {});
+    const code = await createPremiumCode(req.auth!.userId, body.expiresAt);
+    await auditAdmin(req, res, 'PREMIUM_CODE_CREATED', 'PremiumCode', code.id);
+    res.status(201).json({ data: code });
+  }),
+);
+adminRouter.delete(
+  '/premium-codes/:id',
+  csrf,
+  asyncHandler(async (req, res) => {
+    const id = z.string().uuid().parse(req.params.id);
+    const code = await prisma.premiumCode.findUnique({ where: { id }, select: { id: true } });
+    if (!code) throw new AppError(404, 'PREMIUM_CODE_NOT_FOUND', 'Premium code not found.');
+    await prisma.premiumCode.delete({ where: { id } });
+    await auditAdmin(req, res, 'PREMIUM_CODE_DELETED', 'PremiumCode', id);
+    res.status(204).send();
   }),
 );

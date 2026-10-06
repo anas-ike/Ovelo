@@ -4,6 +4,8 @@ export async function getPlanForUser(userId: string) {
   const subscription = await prisma.subscription.findUnique({
     where: { userId },
     select: {
+      status: true,
+      expiresAt: true,
       plan: {
         select: {
           code: true,
@@ -14,7 +16,8 @@ export async function getPlanForUser(userId: string) {
       },
     },
   });
-  if (subscription) return subscription.plan;
+  if (subscription?.status === 'ACTIVE' && (!subscription.expiresAt || subscription.expiresAt > new Date()))
+    return subscription.plan;
   const plan = await prisma.plan.findUnique({
     where: { code: 'FREE' },
     select: {

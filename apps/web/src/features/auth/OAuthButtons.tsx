@@ -13,6 +13,12 @@ export function OAuthButtons({ mode = 'sign-in' }: { mode?: 'sign-in' | 'link' }
     queryFn: () => get<{ data: { google: boolean; discord: boolean } }>('/auth/providers'),
     staleTime: 60000,
   });
+  const profile = useQuery({
+    queryKey: ['auth-profile'],
+    queryFn: () => get<{ data: { accounts: { provider: string }[] } }>('/auth/profile'),
+    enabled: connecting && Boolean(user),
+    staleTime: 30000,
+  });
   async function link(provider: string) {
     if (!user || !window.confirm(`Connect ${provider === 'google' ? 'Google' : 'Discord'} to ${user.email}? This will let that provider sign in to this same Ovelo account. To keep the accounts separate, cancel and use Sign out instead.`)) return;
     setLinking(true);
@@ -33,12 +39,13 @@ export function OAuthButtons({ mode = 'sign-in' }: { mode?: 'sign-in' | 'link' }
       {(['google', 'discord'] as const).map((provider) => {
         const label = provider === 'google' ? 'Google' : 'Discord';
         const enabled = providers.data?.data[provider];
+        const connected = profile.data?.data.accounts.some((account) => account.provider === provider);
         const content = (
           <>
             <span aria-hidden="true" className={`provider-mark ${provider}`}>
               {label[0]}
             </span>
-            {connecting ? 'Connect' : 'Continue with'} {label}
+            {connecting && connected ? 'Connected' : connecting ? 'Connect' : 'Continue with'} {label}
           </>
         );
         return enabled && !connecting ? (
@@ -50,7 +57,7 @@ export function OAuthButtons({ mode = 'sign-in' }: { mode?: 'sign-in' | 'link' }
             type="button"
             key={provider}
             className="oauth-button"
-            disabled={!enabled || linking || !connecting || !user}
+             disabled={!enabled || linking || !connecting || !user || connected}
             onClick={() => void link(provider)}
             title={
               providers.isPending

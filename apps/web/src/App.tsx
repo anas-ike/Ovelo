@@ -38,6 +38,7 @@ const ItemDetail = lazy(() =>
 const GenericPage = lazy(() =>
   import('./pages/GenericPage').then((m) => ({ default: m.GenericPage })),
 );
+const ProfilePage = lazy(() => import('./pages/Profile').then((m) => ({ default: m.Profile })));
 const Documents = lazy(() => import('./pages/Documents').then((m) => ({ default: m.Documents })));
 const Locations = lazy(() => import('./pages/Locations').then((m) => ({ default: m.Locations })));
 const Scan = lazy(() => import('./pages/Scan').then((m) => ({ default: m.Scan })));
@@ -142,6 +143,7 @@ export function App() {
                   />
                 }
               />
+              <Route path="/profile" element={<ProfilePage />} />
             </Route>
           </Route>
           <Route path="*" element={<NotFound />} />

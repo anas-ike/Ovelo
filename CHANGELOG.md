@@ -2,6 +2,28 @@
 
 Every meaningful production pass adds a release here and in [CHANGELOG.js](CHANGELOG.js). The root package version is the application version. See [release workflow](docs/releases.md) and [production verification](docs/production-verification.md). Previous history is retained.
 
+## v0.4.2 — Profiles and Premium Access Administration
+
+Date: 2026-10-06
+
+### Added
+
+- The top-right profile circle opens a profile page with name editing, secure JPG/PNG/WEBP profile-picture upload/removal, connected sign-in methods, and subscription status/code redemption.
+- Settings now identifies already connected providers as connected instead of offering a duplicate link.
+- Owners/admins can generate one-time Premium access codes, copy the raw code once, view masked code records, and permanently delete codes. Code redemption is hashed, atomic, CSRF-protected, rate-limited, and cannot be reused.
+- Administrator Users actions can directly activate or pause Premium for a normal user. This changes only the subscription state and records an audit/security event; it does not change roles or grant administrator access.
+
+### Deferred
+
+- Premium-data ZIP export, 60-day download window, automatic deletion, and an administrator data-deletion toggle are intentionally deferred for a separate design pass.
+
+### Verification
+
+- Disposable API suite: **PASS — 80 tests, none skipped**. Root suite: **11 passed**; default API suite: **37 passed, 43 skipped** without disposable services. Typecheck, lint, build, audit and secret checks passed.
+- Built Chromium: **PASS — 16 workflow groups**, including connected Discord status, top-right profile navigation, first-time/repeat provider sign-in, separate sessions and the Premium access-code administrator surface. The 72-check responsive administrator audit passed.
+- Production deployment: **PASS — v0.4.2 migration applied**, API health 200, web/API/worker started, ports unchanged, 36 public/auth layout checks passed, nine administrator HTML gates and 11 protected API/profile endpoints passed. Google/Discord initialization passed with secure state and Discord `identify email`.
+- Live provider account consent, primary-owner login, recovery delivery, profile upload on production, and authenticated Premium redemption remain untested because authorized credentials are unavailable. Production database metadata retained one primary owner, two normal users, two items, and no premium codes.
+
 ## v0.4.1 — Passwordless Provider Sign-in and Administrator Entry
 
 Date: 2026-10-06

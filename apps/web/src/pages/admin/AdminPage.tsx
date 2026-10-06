@@ -38,7 +38,9 @@ type Row = {
   user?: { name: string; email: string };
   plan?: { name: string };
   status?: string;
+  subscription?: { status: string; plan: { code: string; name: string } } | null;
 };
+type PremiumCodeRow = { id: string; codeLastFour: string; redeemedAt: string | null; expiresAt: string | null; createdAt: string; plan: { name: string }; redeemedBy: { name: string; email: string } | null };
 const sections = [
   'overview',
   'users',
@@ -86,6 +88,11 @@ function AdminConsole() {
       ),
     enabled: !!me.data && !['overview', 'settings'].includes(section) && sections.includes(section),
   });
+  const premiumCodes = useQuery<{ data: PremiumCodeRow[] }>({
+    queryKey: ['admin-premium-codes'],
+    queryFn: () => get<{ data: { id: string; codeLastFour: string; redeemedAt: string | null; expiresAt: string | null; createdAt: string; plan: { name: string }; redeemedBy: { name: string; email: string } | null }[] }>('/admin/premium-codes'),
+    enabled: section === 'subscriptions' && !!me.data,
+  });
   const overview = useQuery({
     queryKey: ['admin-overview'],
     queryFn: () =>
@@ -107,6 +114,7 @@ function AdminConsole() {
     try {
       await fn();
       await client.invalidateQueries({ queryKey: ['admin-section'] });
+      await client.invalidateQueries({ queryKey: ['admin-premium-codes'] });
       setMessage(success);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Operation failed.');
@@ -201,6 +209,7 @@ function AdminConsole() {
             </p>
           ) : (
             <>
+              {section === 'subscriptions' && <PremiumCodePanel query={premiumCodes} onAction={action} />}
               <div className="section-head">
                 <Field label="Search">
                   <Input
@@ -243,7 +252,7 @@ function AdminConsole() {
                         </h3>
                         <p>{r.email || r.admin?.name || r.user?.email}</p>
                         <p>
-                          {[r.role, r.result, r.status, r.plan?.name, r.state, r.errorCode]
+                          {[r.role, r.result, r.status, r.subscription?.plan.name, r.subscription?.status, r.plan?.name, r.state, r.errorCode]
                             .filter(Boolean)
                             .join(' · ')}
                         </p>
@@ -357,22 +366,28 @@ function AdminConsole() {
                         </Button>
                       )}
                       {section === 'users' && r.role === 'USER' && (
-                        <Button
-                          variant="ghost"
-                          disabled={busy}
-                          onClick={() => {
-                            if (
-                              r.disabledAt ||
-                              window.confirm('Disable this user and revoke their active sessions?')
-                            )
-                              void action(
-                                () => patch(`/admin/users/${r.id}`, { disabled: !r.disabledAt }),
-                                'User status updated.',
-                              );
-                          }}
-                        >
-                          {r.disabledAt ? 'Enable user' : 'Disable user'}
-                        </Button>
+                        <div className="record-actions">
+                          <Button
+                            variant="ghost"
+                            disabled={busy}
+                            onClick={() => {
+                              if (r.disabledAt || window.confirm('Disable this user and revoke their active sessions?'))
+                                void action(() => patch(`/admin/users/${r.id}`, { disabled: !r.disabledAt }), 'User status updated.');
+                            }}
+                          >
+                            {r.disabledAt ? 'Enable user' : 'Disable user'}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            disabled={busy || Boolean(r.disabledAt)}
+                            onClick={() => void action(
+                              () => patch(`/admin/users/${r.id}/subscription`, { action: r.subscription?.status === 'ACTIVE' && r.subscription.plan.code === 'PREMIUM' ? 'PAUSE' : 'ACTIVATE' }),
+                              r.subscription?.status === 'ACTIVE' && r.subscription.plan.code === 'PREMIUM' ? 'Premium paused.' : 'Premium activated.',
+                            )}
+                          >
+                            {r.subscription?.status === 'ACTIVE' && r.subscription.plan.code === 'PREMIUM' ? 'Pause premium' : 'Activate premium'}
+                          </Button>
+                        </div>
                       )}
                     </article>
                   ))}
@@ -489,6 +504,24 @@ function CreateAdmin({
         </Button>
       </form>
     </Modal>
+  );
+}
+
+function PremiumCodePanel({
+  query,
+  onAction,
+}: {
+  query: { isPending: boolean; error: Error | null; data?: { data: PremiumCodeRow[] } };
+  onAction: (fn: () => Promise<unknown>, success: string) => Promise<void>;
+}) {
+  const [newCode, setNewCode] = useState('');
+  const rows = query.data?.data || [];
+  return (
+    <section className="admin-card records-stack premium-code-panel">
+      <div className="admin-card-head"><div><h2>Premium access codes</h2><p>Each generated code activates Premium once. Delete unused codes to invalidate them.</p></div><Button onClick={() => void onAction(async () => { const result = await post<{ data: { code: string } }>('/admin/premium-codes', {}); setNewCode(result.data.code); }, 'Premium code created.')}>Create premium code</Button></div>
+      {newCode && <p role="status" className="success-note">New code: <strong>{newCode}</strong> — copy it now; it will not be shown again.</p>}
+      {query.isPending ? <Loading rows={2} /> : query.error ? <p role="alert" className="form-alert">Could not load premium codes.</p> : !rows.length ? <p className="inline-empty">No premium codes created.</p> : <div className="records-stack">{rows.map((row: PremiumCodeRow) => <article className="record-card" key={row.id}><div><h3>OVL-PREMIUM-••••{row.codeLastFour}</h3><p>{row.plan.name} · {row.redeemedAt ? `Redeemed by ${row.redeemedBy?.email || 'user'}` : 'Available'}</p><small>Created {new Date(row.createdAt).toLocaleString()}</small></div><Button variant="ghost" onClick={() => { if (window.confirm('Delete this premium code permanently? It can no longer be used.')) void onAction(() => del(`/admin/premium-codes/${row.id}`), 'Premium code deleted.'); }}>Delete</Button></article>)}</div>}
+    </section>
   );
 }
 function AdminSettings({ admin, onChanged }: { admin: Admin; onChanged: () => void }) {

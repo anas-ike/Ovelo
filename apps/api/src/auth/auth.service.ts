@@ -20,7 +20,12 @@ export const publicUserSelect = {
   role: true,
   emailVerifiedAt: true,
   createdAt: true,
+  avatarStorageObjectId: true,
 } as const;
+export function toPublicUser<T extends { avatarStorageObjectId?: string | null }>(user: T) {
+  const { avatarStorageObjectId, ...publicUser } = user;
+  return { ...publicUser, hasAvatar: Boolean(avatarStorageObjectId) };
+}
 export async function register(
   input: {
     name: string;
@@ -89,7 +94,7 @@ export async function register(
         { userId: created.id, policy: 'PRIVACY', version: input.privacyVersion! },
       ],
     });
-    return created;
+    return toPublicUser(created);
   });
   if (!providerVerifiedEmail && (env.EMAIL_VERIFICATION_REQUIRED || identity))
     await sendVerificationEmail(user.email, token);
@@ -137,6 +142,7 @@ export async function authenticate(email: string, password: string) {
       passwordHash: true,
       role: true,
       emailVerifiedAt: true,
+      avatarStorageObjectId: true,
       disabledAt: true,
       deletedAt: true,
     },
@@ -148,7 +154,7 @@ export async function authenticate(email: string, password: string) {
   if (env.EMAIL_VERIFICATION_REQUIRED && !user.emailVerifiedAt)
     throw new AppError(403, 'EMAIL_NOT_VERIFIED', 'Verify your email before signing in.');
   await prisma.securityEvent.create({ data: { userId: user.id, type: 'LOGIN_SUCCESS' } });
-  return user;
+  return toPublicUser(user);
 }
 export async function requireLoginPolicyConsent(
   userId: string,

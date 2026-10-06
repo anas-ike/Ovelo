@@ -17,6 +17,7 @@ import { useState } from 'react';
 import { Logo } from '../components/Logo';
 import { Button } from '../components/Button';
 import { useAuth } from '../features/auth/AuthProvider';
+import { apiBase } from '../lib/api';
 const nav = [
   { to: '/dashboard', label: 'Overview', icon: LayoutDashboard },
   { to: '/inventory', label: 'Inventory', icon: Boxes },
@@ -87,7 +88,7 @@ export function AppLayout() {
             <span>Settings</span>
           </NavLink>
           <div className="profile-mini">
-            <div className="avatar">{user?.name.slice(0, 1).toUpperCase()}</div>
+            {user?.hasAvatar ? <img className="avatar avatar-image" src={`${apiBase}/auth/avatar`} alt="" /> : <div className="avatar">{user?.name.slice(0, 1).toUpperCase()}</div>}
             <div>
               <strong>{user?.name}</strong>
               <span>{user?.email}</span>
@@ -144,7 +145,9 @@ export function AppLayout() {
             >
               <Bell size={19} />
             </button>
-            <div className="topbar-avatar">{user?.name.slice(0, 1).toUpperCase()}</div>
+            <button className="topbar-avatar profile-trigger" onClick={() => navigate('/profile')} aria-label="Open profile">
+              {user?.hasAvatar ? <img className="avatar-image" src={`${apiBase}/auth/avatar`} alt="" /> : user?.name.slice(0, 1).toUpperCase()}
+            </button>
           </div>
         </header>
         <div className="page-content">

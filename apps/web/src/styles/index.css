@@ -1167,6 +1167,16 @@ textarea:focus-visible {
   width: 28px;
   height: 28px;
 }
+.avatar-image,
+.profile-picture {
+  object-fit: cover;
+  overflow: hidden;
+}
+.avatar-image {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+}
 .profile-mini > div:nth-child(2) {
   min-width: 0;
   flex: 1;
@@ -1236,6 +1246,47 @@ textarea:focus-visible {
   width: 31px;
   height: 31px;
   margin-left: 8px;
+}
+.profile-trigger {
+  padding: 0;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+.profile-trigger:hover,
+.profile-trigger:focus-visible {
+  border-color: var(--accent);
+}
+.profile-page {
+  max-width: 1040px;
+}
+.profile-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.profile-picture-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.profile-picture {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+}
+.profile-picture-fallback {
+  display: grid;
+  place-items: center;
+  background: #3b4e3c;
+  color: var(--accent);
+  font: 600 30px Manrope;
+}
+.profile-grid .detail-section {
+  min-width: 0;
+}
+.settings-provider-status {
+  color: var(--accent);
+  font-weight: 600;
 }
 .page-content {
   max-width: 1400px;
@@ -2371,6 +2422,12 @@ textarea:focus-visible {
   }
 }
 @media (max-width: 760px) {
+  .profile-grid {
+    grid-template-columns: 1fr;
+  }
+  .profile-picture-row {
+    align-items: flex-start;
+  }
   .admin-content {
     padding: 20px 16px;
   }

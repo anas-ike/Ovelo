@@ -32,14 +32,7 @@ export function GenericPage({
         </span>
       </div>
       {title === 'Settings' ? (
-        <section className="detail-section">
-          <h3>Connect a provider to this account</h3>
-          <p>
-            Connecting a provider lets that identity sign in to your current Ovelo account. To
-            switch accounts, sign out and use the sign-in page.
-          </p>
-          <OAuthButtons mode="link" />
-        </section>
+        <SettingsContent />
       ) : endpoint && query.isLoading ? (
         <Loading rows={4} />
       ) : endpoint && query.error ? (
@@ -55,6 +48,37 @@ export function GenericPage({
           }
         />
       )}
+    </div>
+  );
+}
+
+function SettingsContent() {
+  const profile = useQuery({
+    queryKey: ['auth-profile'],
+    queryFn: () => get<{ data: { accounts: { provider: string }[]; subscription: { status: string; plan: { code: string; name: string } } | null } }>('/auth/profile'),
+  });
+  if (profile.isPending) return <Loading rows={4} />;
+  if (profile.error) return <div className="page-error">Could not load your settings.</div>;
+  const connected = new Set(profile.data.data.accounts.map((account) => account.provider));
+  const subscription = profile.data.data.subscription;
+  return (
+    <div className="records-stack">
+      <section className="detail-section">
+        <h3>Connected sign-in providers</h3>
+        <p>
+          Connected providers sign in to this Ovelo account. To switch accounts, sign out and use
+          the sign-in page.
+        </p>
+        <p className="settings-provider-status">
+          {connected.size ? Array.from(connected).map((provider) => provider.charAt(0).toUpperCase() + provider.slice(1)).join(' · ') : 'No providers connected yet.'}
+        </p>
+        <OAuthButtons mode="link" />
+      </section>
+      <section className="detail-section">
+        <h3>Subscription</h3>
+        <p>{subscription?.plan.name || 'Free'} · {subscription?.status || 'ACTIVE'}</p>
+        <Link className="text-button" to="/profile">Manage your profile and subscription →</Link>
+      </section>
     </div>
   );
 }

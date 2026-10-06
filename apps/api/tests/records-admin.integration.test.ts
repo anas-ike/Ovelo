@@ -135,6 +135,7 @@ describe.skipIf(process.env.RUN_DB_TESTS !== 'true')(
         'audit-logs',
         'background-jobs',
         'subscriptions',
+        'premium-codes',
       ])
         expect((await request(app).get(`/api/v1/admin/${path}`)).status).toBe(401);
       expect((await a.get('/api/v1/admin/overview')).status).toBe(401);
@@ -153,6 +154,37 @@ describe.skipIf(process.env.RUN_DB_TESTS !== 'true')(
             .send({ email: secondaryEmail, name: 'Secondary', password })
         ).status,
       ).toBe(403);
+    });
+    it('supports profile pictures, one-time premium codes, and audited admin subscription controls', async () => {
+      expect((await a.patch(`/api/v1/admin/users/${userA}/subscription`).send({ action: 'ACTIVATE' })).status).toBe(401);
+      const image = await sharp({ create: { width: 40, height: 40, channels: 3, background: 'green' } }).jpeg().toBuffer();
+      const profile = await a.get('/api/v1/auth/profile');
+      expect(profile.status).toBe(200);
+      expect(profile.body.data.user.hasAvatar).toBe(false);
+      const avatar = await a.post('/api/v1/auth/avatar').set('X-CSRF-Token', csrfA).attach('file', image, 'profile.jpg');
+      expect(avatar.status).toBe(200);
+      expect((await a.get('/api/v1/auth/profile')).body.data.user.hasAvatar).toBe(true);
+      expect((await a.get('/api/v1/auth/avatar')).status).toBe(200);
+      expect((await a.patch('/api/v1/auth/profile').set('X-CSRF-Token', csrfA).send({ name: 'Updated Test A' })).status).toBe(200);
+      expect((await a.get('/api/v1/auth/me')).body.data.user.name).toBe('Updated Test A');
+      const created = await owner.post('/api/v1/admin/premium-codes').set('X-CSRF-Token', csrfOwner).send({});
+      expect(created.status).toBe(201);
+      const code = created.body.data.code as string;
+      expect(code).toMatch(/^OVL-PREMIUM-[A-F0-9]{20}$/);
+      const redeemed = await a.post('/api/v1/auth/subscription/redeem').set('X-CSRF-Token', csrfA).send({ code });
+      expect(redeemed.status).toBe(200);
+      expect((await a.get('/api/v1/auth/profile')).body.data.subscription).toMatchObject({ status: 'ACTIVE', plan: { code: 'PREMIUM' } });
+      const bCsrf = (await b.get('/api/v1/auth/csrf')).body.data.csrfToken;
+      const reused = await b.post('/api/v1/auth/subscription/redeem').set('X-CSRF-Token', bCsrf).send({ code });
+      expect(reused.status).toBe(400);
+      expect((await owner.patch(`/api/v1/admin/users/${userA}/subscription`).set('X-CSRF-Token', csrfOwner).send({ action: 'PAUSE' })).status).toBe(200);
+      expect((await a.get('/api/v1/auth/profile')).body.data.subscription).toMatchObject({ status: 'PAUSED', plan: { code: 'PREMIUM' } });
+      expect((await owner.patch(`/api/v1/admin/users/${userA}/subscription`).set('X-CSRF-Token', csrfOwner).send({ action: 'ACTIVATE' })).status).toBe(200);
+      const deleted = await owner.post('/api/v1/admin/premium-codes').set('X-CSRF-Token', csrfOwner).send({});
+      expect((await owner.delete(`/api/v1/admin/premium-codes/${deleted.body.data.id}`).set('X-CSRF-Token', csrfOwner)).status).toBe(204);
+      expect((await a.post('/api/v1/auth/subscription/redeem').set('X-CSRF-Token', csrfA).send({ code: deleted.body.data.code })).status).toBe(400);
+      expect((await a.delete('/api/v1/auth/avatar').set('X-CSRF-Token', csrfA)).status).toBe(204);
+      expect((await a.get('/api/v1/auth/profile')).body.data.user.hasAvatar).toBe(false);
     });
     it('creates a located item and securely uploads/lists/downloads its documents', async () => {
       const maps = await a
