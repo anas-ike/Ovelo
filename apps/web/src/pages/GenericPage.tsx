@@ -23,7 +23,6 @@ export function GenericPage({
     <div className="generic-page">
       <div className="generic-head">
         <div>
-          <span className="eyebrow">OVelo WORKSPACE</span>
           <h2>{title}</h2>
           <p>{description}</p>
         </div>
@@ -77,7 +76,7 @@ function SettingsContent() {
       <section className="detail-section">
         <h3>Subscription</h3>
         <p>{subscription?.plan.name || 'Free'} · {subscription?.status || 'ACTIVE'}</p>
-        <Link className="text-button" to="/profile">Manage your profile and subscription →</Link>
+        <Link className="text-button" to="/profile">Manage subscription →</Link>
       </section>
     </div>
   );

@@ -131,7 +131,6 @@ export function AppLayout() {
             <Menu size={20} />
           </button>
           <div className="page-heading">
-            <span className="eyebrow">YOUR SPACE</span>
             <h1>{heading}</h1>
           </div>
           <div className="topbar-actions">

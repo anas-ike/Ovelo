@@ -14,7 +14,6 @@ export function AuthShell({
       <div className="auth-visual">
         <Logo />
         <div>
-          <span className="eyebrow">WHAT DO I OWN?</span>
           <div className="visual-title" aria-hidden="true">
             A clearer
             <br />
@@ -29,7 +28,6 @@ export function AuthShell({
           <Logo />
         </div>
         <div className="auth-form-wrap">
-          <span className="eyebrow">WELCOME TO OVELO</span>
           <h1>{title}</h1>
           <p className="auth-subtitle">{subtitle}</p>
           {children}

@@ -576,8 +576,9 @@ function AdminSettings({ admin, onChanged }: { admin: Admin; onChanged: () => vo
             />
           </Field>
           <Button loading={busy} type="submit">
-            Change password & revoke sessions
+            Change password
           </Button>
+          <p className="field-hint">Changing your password signs out all sessions.</p>
         </form>
         <h3>Linked provider identities</h3>
         {q.error ? (

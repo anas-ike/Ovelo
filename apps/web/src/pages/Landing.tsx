@@ -1,4 +1,4 @@
-import { ArrowRight, Check, LockKeyhole, ScanLine, ShieldCheck, Sparkles } from 'lucide-react';
+import { ArrowRight, Check, LockKeyhole, ScanLine, ShieldCheck } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Logo } from '../components/Logo';
 export function Landing() {
@@ -24,7 +24,7 @@ export function Landing() {
         <section className="hero">
           <div className="hero-copy">
             <div className="kicker">
-              <Sparkles size={14} /> A private record of what matters
+              <LockKeyhole size={14} /> A private record of what matters
             </div>
             <h1>
               Know what
@@ -47,62 +47,45 @@ export function Landing() {
               <LockKeyhole size={14} /> Private by design. Yours by default.
             </div>
           </div>
-          <div className="hero-art">
-            <div className="orb orb-one" />
-            <div className="orb orb-two" />
+          <figure className="hero-art" aria-label="Example inventory, showing three illustrative ownership records">
             <div className="inventory-card">
-              <div className="inventory-top">
-                <span className="mini-mark">o</span>
-                <span>MY INVENTORY</span>
-                <span className="live-dot" />
-              </div>
+              <div className="inventory-top" role="heading" aria-level={3}>Example inventory</div>
               <div className="inventory-total">
-                <span>Everything I own</span>
+                <span>The things you keep</span>
                 <strong>
-                  24 <small>items</small>
+                  Sample <small>records</small>
                 </strong>
-              </div>
-              <div className="inventory-line">
-                <span />
-                <span />
-                <span />
-                <span />
-                <span />
               </div>
               <div className="inventory-list">
                 <div className="inventory-item">
-                  <span className="item-art laptop" />
+                  <span className="record-index" aria-hidden="true">01</span>
                   <div>
                     <strong>MacBook Pro</strong>
                     <small>Electronics · Study</small>
                   </div>
-                  <b>420 KD</b>
                 </div>
                 <div className="inventory-item">
-                  <span className="item-art camera" />
+                  <span className="record-index" aria-hidden="true">02</span>
                   <div>
                     <strong>Fujifilm X100V</strong>
                     <small>Electronics · Office</small>
                   </div>
-                  <b>850 KD</b>
                 </div>
                 <div className="inventory-item">
-                  <span className="item-art watch" />
+                  <span className="record-index" aria-hidden="true">03</span>
                   <div>
                     <strong>Seiko Presage</strong>
                     <small>Accessories · Bedroom</small>
                   </div>
-                  <b>290 KD</b>
                 </div>
               </div>
               <div className="inventory-footer">
                 <span>
-                  <span className="status-pill" /> 3 warranties expiring soon
+                  <LockKeyhole size={14} aria-hidden="true" /> Receipts, warranties, and repairs stay together.
                 </span>
-                <ArrowRight size={15} />
               </div>
             </div>
-          </div>
+          </figure>
         </section>
         <section className="trust-row">
           <span>Built for a clearer relationship with what you own</span>
@@ -120,7 +103,6 @@ export function Landing() {
         </section>
         <section id="how" className="feature-section">
           <div className="section-intro">
-            <span className="eyebrow">OWNERSHIP, ORGANIZED</span>
             <h2>
               The record behind
               <br />
@@ -130,7 +112,6 @@ export function Landing() {
           </div>
           <div className="feature-grid">
             <article>
-              <span className="feature-number">01</span>
               <h3>Remember the details</h3>
               <p>
                 Serial numbers, locations, value, warranty dates, repairs — all connected to the
@@ -138,7 +119,6 @@ export function Landing() {
               </p>
             </article>
             <article>
-              <span className="feature-number">02</span>
               <h3>Find it in a moment</h3>
               <p>
                 Search by name, scan a code, or browse your spaces. Ovelo stays fast as your
@@ -146,7 +126,6 @@ export function Landing() {
               </p>
             </article>
             <article>
-              <span className="feature-number">03</span>
               <h3>Keep the history</h3>
               <p>
                 When something is sold, repaired, or moved, the story stays with it. Nothing
@@ -157,7 +136,6 @@ export function Landing() {
         </section>
         <section id="privacy" className="privacy-section">
           <div>
-            <span className="eyebrow">A QUIET KIND OF SECURITY</span>
             <h2>
               Your things.
               <br />
@@ -172,9 +150,9 @@ export function Landing() {
             </Link>
           </div>
           <div className="privacy-quote">
-            <LockKeyhole size={20} />
-            <p>“This is where I keep track of everything I own.”</p>
-            <span>— the point of Ovelo</span>
+            <LockKeyhole size={20} aria-hidden="true" />
+            <p>Your inventory belongs to you.</p>
+            <Link className="text-link" to="/privacy">Read the privacy policy <ArrowRight size={15} aria-hidden="true" /></Link>
           </div>
         </section>
       </main>

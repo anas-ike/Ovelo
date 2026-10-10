@@ -37,7 +37,7 @@ export function Profile() {
   return (
     <div className="profile-page">
       <div className="generic-head">
-        <div><span className="eyebrow">YOUR SPACE</span><h2>Profile</h2><p>Manage your profile, sign-in methods, and subscription.</p></div>
+        <div><h2>Profile</h2><p>Manage your profile, sign-in methods, and subscription.</p></div>
         <span className="generic-head-icon"><UserRound size={23} /></span>
       </div>
       {error && <p role="alert" className="form-alert">{error}</p>}
@@ -64,14 +64,14 @@ export function Profile() {
           <h3>Personal details</h3>
           <Field label="Name"><Input required maxLength={100} value={displayName} onChange={(event) => setName(event.target.value)} /></Field>
           <Field label="Email"><Input value={current.user.email} readOnly /></Field>
-          <p className="field-hint">To change your email, use the account security controls in Settings.</p>
+          <p className="field-hint">Your verified sign-in email.</p>
           <Button type="submit" loading={busy}>Save profile</Button>
         </form>
         <section className="detail-section records-stack">
           <h3>Sign-in methods</h3>
           <p>{current.accounts.length ? current.accounts.map((account) => account.provider.charAt(0).toUpperCase() + account.provider.slice(1)).join(' · ') : 'Email password only'}</p>
           <OAuthButtons mode="link" />
-          <Link className="text-button" to="/settings">Manage email, password, and sessions →</Link>
+          <Link className="text-button" to="/settings">Account settings →</Link>
         </section>
         <section className="detail-section records-stack">
           <h3>Subscription</h3>

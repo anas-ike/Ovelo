@@ -76,7 +76,7 @@ export function Dashboard() {
           <h2>{empty ? 'Make your inventory yours.' : 'Good to see you again.'}</h2>
           <p>
             {empty
-              ? 'Start with one thing you own. Ovelo will take care of the details.'
+              ? 'Add one item, then attach its receipts and warranty details.'
               : 'Here is the latest picture of everything you own.'}
           </p>
         </div>
@@ -87,7 +87,6 @@ export function Dashboard() {
       {empty ? (
         <div className="onboarding-card">
           <div className="onboarding-copy">
-            <span className="eyebrow">YOUR FIRST RECORD</span>
             <h3>What do you own?</h3>
             <p>
               Capture the essentials first — name, value, and where it lives. Add receipts,
@@ -96,13 +95,6 @@ export function Dashboard() {
             <Link className="button button-primary" to="/add-item">
               Add your first item <ArrowUpRight size={16} />
             </Link>
-          </div>
-          <div className="onboarding-orbit">
-            <div className="orbit-ring ring-one" />
-            <div className="orbit-ring ring-two" />
-            <div className="orbit-core">
-              <Package size={27} />
-            </div>
           </div>
         </div>
       ) : (
@@ -134,7 +126,6 @@ export function Dashboard() {
             <section className="panel activity-panel">
               <div className="panel-head">
                 <div>
-                  <span className="eyebrow">THE PAPER TRAIL</span>
                   <h3>Recent activity</h3>
                 </div>
                 <Link className="subtle-link" to="/activity">
@@ -167,7 +158,6 @@ export function Dashboard() {
             <section className="panel warranty-panel">
               <div className="panel-head">
                 <div>
-                  <span className="eyebrow">KEEP AN EYE ON IT</span>
                   <h3>Warranty alerts</h3>
                 </div>
                 <Link className="subtle-link" to="/warranties">
@@ -211,7 +201,6 @@ export function Dashboard() {
             <section className="panel expensive-panel">
               <div className="panel-head">
                 <div>
-                  <span className="eyebrow">YOUR HIGHEST VALUE</span>
                   <h3>Most expensive</h3>
                 </div>
                 <Link className="subtle-link" to="/inventory?sort=price">
@@ -236,7 +225,6 @@ export function Dashboard() {
             <section className="panel storage-panel">
               <div className="panel-head">
                 <div>
-                  <span className="eyebrow">PRIVATE STORAGE</span>
                   <h3>Space used</h3>
                 </div>
                 <span className="storage-number">{Math.round(storagePercent)}%</span>
